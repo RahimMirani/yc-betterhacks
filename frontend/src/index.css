@@ -1,13 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #ffffff;
+  color: #1a1a1a;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+}
+
+.font-display {
+  font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+}
+
+/* Smooth focus transitions */
+input:focus,
+button:focus-visible {
+  outline: none;
+}
+
+/* Selection color — subtle highlight for text selection */
+::selection {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ── Paper content viewer typography ── */
+
+article p {
+  text-rendering: optimizeLegibility;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+article h1,
+article h2,
+article h3 {
+  text-rendering: optimizeLegibility;
+}
+
+/* Smooth scroll inside content viewer */
+.overflow-y-auto {
+  scroll-behavior: smooth;
 }

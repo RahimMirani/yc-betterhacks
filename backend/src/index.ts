@@ -1,10 +1,12 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
-import { env } from './config/env'
 import { papersRouter } from './routes/papers'
 import { errorHandler } from './middleware/error-handler'
+import { config } from './config';
+import pdfRoutes from './routes/pdf';
+import implementRoutes from './routes/implement';
 
-const app = express()
+const app = express();
 
 app.use(cors())
 app.use(express.json())
@@ -18,6 +20,12 @@ app.use('/api/papers', papersRouter)
 
 app.use(errorHandler)
 
-app.listen(env.PORT, () => {
-  console.log(`Server running on http://localhost:${env.PORT}`)
-})
+// Routes
+app.use('/api', pdfRoutes);
+app.use('/api', implementRoutes);
+
+// Start server
+app.listen(config.port, () => {
+  console.log(`Server running on http://localhost:${config.port}`);
+  console.log(`Health check: http://localhost:${config.port}/health`);
+});
