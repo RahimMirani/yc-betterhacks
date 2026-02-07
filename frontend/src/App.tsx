@@ -46,23 +46,20 @@ interface ImplementationResult {
   };
 }
 
-// App states
 type AppState = 'upload' | 'reading';
 
 export default function App() {
   // App state
   const [appState, setAppState] = useState<AppState>('upload');
 
-  // PDF data
-  const [pdfUrl, setPdfUrl] = useState<string>('');
+  // PDF / paper data
   const [paperText, setPaperText] = useState<string>('');
   const [paperTitle, setPaperTitle] = useState<string>('');
-  const [numPages, setNumPages] = useState<number>(0);
 
   // Outline & navigation
   const [outline, setOutline] = useState<OutlineItem[]>([]);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [scrollToPage, setScrollToPage] = useState<number | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState<string>('');
+  const [scrollToSectionId, setScrollToSectionId] = useState<string | null>(null);
 
   // Loading states
   const [isUploading, setIsUploading] = useState(false);
@@ -77,17 +74,12 @@ export default function App() {
   // Panel visibility
   const [showImplementPanel, setShowImplementPanel] = useState(false);
 
-  // Derive current section from page + outline
-  const currentSection = useMemo(() => {
-    if (!outline.length || !currentPage) return '';
-    let section = '';
-    for (const item of outline) {
-      if (item.pageNumber <= currentPage) {
-        section = item.title;
-      }
-    }
-    return section;
-  }, [currentPage, outline]);
+  // Derive current section name for breadcrumb
+  const currentSectionName = useMemo(() => {
+    if (!activeSectionId || !outline.length) return '';
+    const item = outline.find((o) => o.id === activeSectionId);
+    return item?.title || '';
+  }, [activeSectionId, outline]);
 
   // ── PDF Upload Handlers ──
 
@@ -97,13 +89,9 @@ export default function App() {
     setImplementError('');
 
     try {
-      const url = URL.createObjectURL(file);
-      setPdfUrl(url);
-
       const result = await extractPdf(file);
       setPaperText(result.text);
       setPaperTitle(result.title || file.name.replace('.pdf', ''));
-      setNumPages(result.numPages);
       setAppState('reading');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to process PDF';
@@ -121,10 +109,10 @@ export default function App() {
 
     try {
       const result = await extractPdfFromUrl(url);
-      setPdfUrl(result.pdfBlobUrl);
       setPaperText(result.text);
-      setPaperTitle(result.title || new URL(url).pathname.split('/').pop() || 'Research Paper');
-      setNumPages(result.numPages);
+      setPaperTitle(
+        result.title || new URL(url).pathname.split('/').pop() || 'Research Paper'
+      );
       setAppState('reading');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load PDF from URL';
@@ -158,7 +146,8 @@ export default function App() {
       });
       setImplementResult(result);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to generate implementation';
+      const message =
+        error instanceof Error ? error.message : 'Failed to generate implementation';
       setImplementError(message);
     } finally {
       setIsImplementing(false);
@@ -167,52 +156,35 @@ export default function App() {
 
   // ── Outline & Navigation ──
 
-  const handleOutlineExtracted = useCallback(
-    (extractedOutline: OutlineItem[]) => {
-      if (extractedOutline.length > 0) {
-        setOutline(extractedOutline);
-      } else if (paperText && numPages > 0) {
-        // Fallback: extract headings from the paper text
-        const fallback = extractOutlineFromText(paperText, numPages);
-        setOutline(fallback);
-      }
-    },
-    [paperText, numPages]
-  );
-
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
+  const handleOutlineExtracted = useCallback((extractedOutline: OutlineItem[]) => {
+    setOutline(extractedOutline);
+    if (extractedOutline.length > 0) {
+      setActiveSectionId(extractedOutline[0].id);
+    }
   }, []);
 
-  const handleNavigateToPage = useCallback((page: number) => {
-    setScrollToPage(page);
-    // Reset after short delay so clicking the same item again still works
-    setTimeout(() => setScrollToPage(null), 500);
+  const handleSectionChange = useCallback((sectionId: string) => {
+    setActiveSectionId(sectionId);
   }, []);
 
-  const handleDocumentLoad = useCallback(
-    (np: number) => {
-      if (!numPages) setNumPages(np);
-    },
-    [numPages]
-  );
+  const handleNavigateToSection = useCallback((sectionId: string) => {
+    setScrollToSectionId(sectionId);
+    setTimeout(() => setScrollToSectionId(null), 500);
+  }, []);
 
   // ── Reset ──
 
   const handleReset = useCallback(() => {
-    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-    setPdfUrl('');
     setPaperText('');
     setPaperTitle('');
-    setNumPages(0);
     setOutline([]);
-    setCurrentPage(1);
-    setScrollToPage(null);
+    setActiveSectionId('');
+    setScrollToSectionId(null);
     setImplementResult(null);
     setImplementError('');
     setShowImplementPanel(false);
     setAppState('upload');
-  }, [pdfUrl]);
+  }, []);
 
   // ── Upload screen ──
 
@@ -235,7 +207,7 @@ export default function App() {
     <div className="h-screen flex flex-col bg-white">
       <Toolbar
         paperTitle={paperTitle}
-        currentSection={currentSection}
+        currentSection={currentSectionName}
         isImplementing={isImplementing}
         hasResult={!!implementResult}
         onImplementPaper={handleImplementPaper}
@@ -243,20 +215,20 @@ export default function App() {
       />
 
       <div className="flex-1 flex min-h-0">
-        {/* Left Sidebar */}
+        {/* Left Sidebar — Outline */}
         <OutlineSidebar
           outline={outline}
-          currentPage={currentPage}
-          onNavigateToPage={handleNavigateToPage}
+          activeSectionId={activeSectionId}
+          onNavigateToSection={handleNavigateToSection}
         />
 
-        {/* PDF Viewer */}
+        {/* Paper Content Viewer */}
         <PaperViewer
-          pdfUrl={pdfUrl}
-          onDocumentLoad={handleDocumentLoad}
+          paperText={paperText}
+          paperTitle={paperTitle}
           onOutlineExtracted={handleOutlineExtracted}
-          onPageChange={handlePageChange}
-          scrollToPage={scrollToPage}
+          onSectionChange={handleSectionChange}
+          scrollToSectionId={scrollToSectionId}
         />
 
         {/* Implementation Panel (right side) */}
@@ -354,54 +326,4 @@ export default function App() {
       </div>
     </div>
   );
-}
-
-/**
- * Fallback: extract section headings from paper text when PDF has no embedded outline.
- * Estimates page numbers based on character position in the text.
- */
-function extractOutlineFromText(text: string, totalPages: number): OutlineItem[] {
-  const items: OutlineItem[] = [];
-  const lines = text.split('\n');
-  const totalLength = text.length;
-  let charPos = 0;
-  const seen = new Set<string>();
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    let matched = false;
-    let level = 0;
-
-    // Abstract
-    if (/^Abstract$/i.test(trimmed)) {
-      matched = true;
-      level = 0;
-    }
-    // Numbered sections: "1 Introduction", "1. Introduction"
-    else if (/^\d+\.?\s+[A-Z]/.test(trimmed) && trimmed.length > 4 && trimmed.length < 80) {
-      matched = true;
-      level = 0;
-    }
-    // Sub-sections: "3.1 Architecture", "3.1. Architecture"
-    else if (/^\d+\.\d+\.?\s+[A-Z]/.test(trimmed) && trimmed.length > 4 && trimmed.length < 80) {
-      matched = true;
-      level = 1;
-    }
-    // Common end sections
-    else if (/^(References|Acknowledgments?|Appendix.*)$/i.test(trimmed)) {
-      matched = true;
-      level = 0;
-    }
-
-    if (matched && !seen.has(trimmed)) {
-      seen.add(trimmed);
-      const estimatedPage = Math.max(1, Math.ceil((charPos / totalLength) * totalPages));
-      items.push({ title: trimmed, pageNumber: estimatedPage, level });
-    }
-
-    charPos += line.length + 1;
-  }
-
-  return items;
 }
