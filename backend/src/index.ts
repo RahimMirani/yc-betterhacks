@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { config } from './config';
 import pdfRoutes from './routes/pdf';
+import implementRoutes from './routes/implement';
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.get('/health', (req: Request, res: Response) => {
 
 // Routes
 app.use('/api', pdfRoutes);
+app.use('/api', implementRoutes);
 
 // Start server
 app.listen(config.port, () => {
