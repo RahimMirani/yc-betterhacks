@@ -1,11 +1,12 @@
 import express, { Request, Response } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
-import { getPaperText } from '../store';
-import { search as vectorSearch } from '../vectorStore';
-import { embedText } from '../embeddings';
+import { env } from '../config/env';
+import { findPaperById } from '../db/queries/papers';
+import { findSimilarChunks } from '../services/embeddings';
 
 const router = express.Router();
 
+const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
 const MAX_FALLBACK_CONTEXT_CHARS = 80000;
 const VECTOR_TOP_K = 8;
 
@@ -15,8 +16,8 @@ export interface ExplainRequestBody {
   messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
-function buildContextFromChunks(chunks: { text: string }[]): string {
-  return chunks.map((c, i) => `[Section ${i + 1}]\n${c.text}`).join('\n\n');
+function buildContextFromChunks(chunks: readonly { content: string }[]): string {
+  return chunks.map((c, i) => `[Section ${i + 1}]\n${c.content}`).join('\n\n');
 }
 
 router.post('/', async (req: Request, res: Response): Promise<void> => {
@@ -28,22 +29,17 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const fullText = getPaperText(paperId);
-    if (!fullText) {
+    const paper = await findPaperById(paperId);
+    if (!paper) {
       res.status(404).json({ error: 'Paper not found' });
       return;
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured' });
-      return;
-    }
-
+    const fullText = paper.raw_text;
     let paperContext: string;
+
     try {
-      const queryEmbedding = await embedText(selectedText);
-      const relevantChunks = vectorSearch(paperId, queryEmbedding, VECTOR_TOP_K);
+      const relevantChunks = await findSimilarChunks(paperId, selectedText, VECTOR_TOP_K);
       if (relevantChunks.length > 0) {
         paperContext = buildContextFromChunks(relevantChunks);
       } else {
@@ -59,13 +55,12 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           : fullText;
     }
 
-    const client = new Anthropic({ apiKey });
     const systemPrompt = `You are a helpful assistant that explains research papers. The user is reading a paper and has selected a passage. Use the relevant paper sections below only for context. Focus on explaining the selected passage clearly: definitions, intuition, and how it fits the paper. Be concise but complete. If the user asks follow-up questions, answer in the same helpful tone.
 
 Relevant paper sections (for context only):
 ${paperContext}`;
 
-    const conversationMessages: Anthropic.MessageParam[] =
+    const conversationMessages: Parameters<typeof client.messages.create>[0]['messages'] =
       messages.length > 0
         ? messages.map((m) => ({ role: m.role, content: m.content }))
         : [
@@ -76,7 +71,7 @@ ${paperContext}`;
           ];
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 1024,
       system: systemPrompt,
       messages: conversationMessages,

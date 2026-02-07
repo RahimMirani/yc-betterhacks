@@ -1,27 +1,27 @@
 # Better Papers Backend
 
-TypeScript backend API for the Better Papers application.
+TypeScript backend API for the Better Papers application. Uses **Neon** (Postgres + pgvector) for storage and embeddings, **OpenAI** for embeddings, and **Claude** for explanations and citation relevance.
 
 ## Setup
 
-1. Install dependencies:
+1. **Install dependencies**
    ```bash
    npm install
    ```
 
-2. Run in development mode:
+2. **Database (Neon)**  
+   Create a Neon project and run the migration to enable the `vector` extension and create tables:
+   - In Neon SQL Editor, run the contents of `src/db/migrations/001_create_tables.sql`.
+
+3. **Environment**  
+   Copy `.env.example` to `.env` and set:
+   - `DATABASE_URL` – Neon connection string (required)
+   - `ANTHROPIC_API_KEY` – Claude API (required for explain and citation enrichment)
+   - `OPENAI_API_KEY` – OpenAI API (required for embeddings)
+
+4. **Run**
    ```bash
    npm run dev
-   ```
-
-3. Build for production:
-   ```bash
-   npm run build
-   ```
-
-4. Run production build:
-   ```bash
-   npm start
    ```
 
 ## Project Structure
@@ -29,27 +29,33 @@ TypeScript backend API for the Better Papers application.
 ```
 backend/
 ├── src/
-│   └── index.ts          # Main server entry point
-├── dist/                 # Compiled JavaScript (generated)
+│   ├── config/       # env validation (zod)
+│   ├── db/           # Neon pool, migrations, queries (papers, citations)
+│   ├── middleware/   # upload (multer), error-handler
+│   ├── controllers/  # papers (upload, get, file, citations, text)
+│   ├── routes/      # papers, explain
+│   ├── services/    # pdf-parser, embeddings (OpenAI + Neon), citation-*, claude, semantic-scholar
+│   ├── types/
+│   └── utils/       # text chunking, citation patterns
 ├── package.json
-├── tsconfig.json
-└── README.md
+└── tsconfig.json
 ```
 
 ## API Endpoints
 
-- `GET /health` - Health check endpoint
-- `GET /api/test` - Test endpoint
-- `POST /api/papers/upload` - Upload a PDF (multipart `file`). Returns `{ paperId, filename }`. Text is extracted, chunked, embedded (OpenAI), and stored in an in-memory vector store for semantic search.
-- `GET /api/papers/:paperId/file` - Stream the uploaded PDF file
-- `POST /api/explain` - Get an AI explanation for a selected passage. Uses vector search to retrieve relevant chunks, then Claude for the reply. Body: `{ paperId, selectedText, messages? }`. Returns `{ reply }`
+- `GET /health` – Health check
+- `POST /api/papers/upload` – Upload a PDF. Text is extracted, chunked, embedded (OpenAI), stored in Neon (papers + paper_chunks + citations). Returns `{ paperId, filename, data }`.
+- `GET /api/papers/:paperId` – Paper metadata and citation list
+- `GET /api/papers/:paperId/file` – Stream the uploaded PDF
+- `GET /api/papers/:paperId/text` – Raw text and citation marker positions
+- `GET /api/papers/:paperId/citations/:citationKey` – Citation context (with optional Semantic Scholar enrichment)
+- `POST /api/explain` – Explain a selected passage. Uses Neon pgvector similarity search for relevant chunks, then Claude. Body: `{ paperId, selectedText, messages? }`. Returns `{ reply }`.
 
 ## Environment Variables
 
-Create a `.env` file for environment-specific configuration:
-- `PORT` - Server port (default: 3001)
-- `ANTHROPIC_API_KEY` - Required for `/api/explain` (Claude API)
-- `VOYAGE_API_KEY` - (Recommended) Embeddings via Voyage AI (Anthropic’s partner). Sign up at [voyageai.com](https://www.voyageai.com). Enables vector search on upload and explain.
-- `OPENAI_API_KEY` - Alternative to Voyage for embeddings. If set, used instead of Voyage when `VOYAGE_API_KEY` is not set.
-
-  **Note:** Anthropic does not provide an embedding model. Use either Voyage or OpenAI for vector search. If neither is set, upload still works and explain uses full-paper context (no semantic search).
+| Variable            | Required | Description                          |
+|---------------------|----------|--------------------------------------|
+| `PORT`              | No       | Server port (default 3001)          |
+| `DATABASE_URL`      | Yes      | Neon Postgres connection string      |
+| `ANTHROPIC_API_KEY` | Yes      | Claude API (explain + citation)      |
+| `OPENAI_API_KEY`    | Yes      | OpenAI API (embeddings for pgvector) |
