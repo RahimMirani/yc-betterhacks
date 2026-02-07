@@ -1,4 +1,6 @@
-import * as pdfParse from 'pdf-parse';
+// pdf-parse v1 is CommonJS — use require for reliable import
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pdfParse = require('pdf-parse');
 
 export interface ExtractedPdf {
   text: string;

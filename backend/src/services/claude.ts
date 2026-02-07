@@ -94,21 +94,69 @@ async function callClaude(systemPrompt: string, userPrompt: string, maxTokens: n
 }
 
 /**
+ * Attempts to extract and parse JSON from Claude's response.
+ * Handles: complete code blocks, truncated code blocks, and raw JSON.
+ * For truncated JSON arrays (common with large notebooks), attempts to
+ * recover by closing the array at the last complete object.
+ */
+function extractJson<T>(text: string): T {
+  let jsonString = text;
+
+  // 1. Try to extract from complete ```json ... ``` code block
+  const completeMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  if (completeMatch) {
+    jsonString = completeMatch[1];
+  } else {
+    // 2. Handle truncated code block (starts with ```json but no closing ```)
+    const truncatedMatch = text.match(/```(?:json)?\s*\n?([\s\S]*)/);
+    if (truncatedMatch) {
+      jsonString = truncatedMatch[1];
+    }
+  }
+
+  jsonString = jsonString.trim();
+
+  // First attempt: parse as-is
+  try {
+    return JSON.parse(jsonString) as T;
+  } catch {
+    // JSON is likely truncated — try to recover
+  }
+
+  // Recovery: if it's a truncated JSON array, find the last complete object
+  if (jsonString.startsWith('[')) {
+    // Find the last occurrence of }\n  , or },\n which indicates end of a complete object in the array
+    const lastCompleteObj = jsonString.lastIndexOf('}\n');
+    const lastCompleteObj2 = jsonString.lastIndexOf('},');
+
+    const cutPoint = Math.max(lastCompleteObj, lastCompleteObj2);
+
+    if (cutPoint > 0) {
+      // Cut at the end of the last complete object and close the array
+      let recovered = jsonString.substring(0, cutPoint + 1); // include the }
+      // Remove trailing comma if present
+      recovered = recovered.replace(/,\s*$/, '');
+      recovered += ']';
+
+      try {
+        console.log(`[JSON Recovery] Truncated response recovered. Cut at position ${cutPoint}/${jsonString.length}`);
+        return JSON.parse(recovered) as T;
+      } catch {
+        // Recovery failed too
+      }
+    }
+  }
+
+  console.error('Failed to parse Claude JSON response. Raw text:', text.substring(0, 500));
+  throw new Error('Claude returned invalid JSON. Please try again.');
+}
+
+/**
  * Helper: sends a prompt to Claude and parses the JSON response.
  */
 async function callClaudeJson<T>(systemPrompt: string, userPrompt: string, maxTokens: number = 4096): Promise<T> {
   const text = await callClaude(systemPrompt, userPrompt, maxTokens);
-
-  // Extract JSON from the response (Claude sometimes wraps it in markdown code blocks)
-  const jsonMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-  const jsonString = jsonMatch ? jsonMatch[1] : text;
-
-  try {
-    return JSON.parse(jsonString.trim()) as T;
-  } catch (error) {
-    console.error('Failed to parse Claude JSON response. Raw text:', text.substring(0, 500));
-    throw new Error('Claude returned invalid JSON. Please try again.');
-  }
+  return extractJson<T>(text);
 }
 
 // ─── Pipeline Step 1: Analyze Paper ──────────────────────────────────────────
@@ -250,14 +298,20 @@ Return a JSON array of cell objects. Example:
   { "cell_type": "code", "source": "import torch\\nimport torch.nn as nn" }
 ]
 
-Return ONLY the JSON array, no other text. Make sure the JSON is valid.`;
+CRITICAL OUTPUT RULES:
+- Keep the TOTAL response under 14000 tokens. Be concise.
+- Combine related code into fewer, larger code cells rather than many tiny cells.
+- Keep markdown explanations to 2-4 sentences per cell — be precise, not verbose.
+- Aim for 15-25 total cells.
+- Return ONLY the JSON array, no other text. Make sure the JSON is valid.
+- Do NOT wrap the JSON in markdown code fences.`;
 
 export async function generateNotebook(
   paperText: string,
   analysis: PaperAnalysis,
   plan: ImplementationPlan
 ): Promise<GeneratedNotebook> {
-  const userPrompt = `Generate a complete, runnable Google Colab notebook implementing this paper.
+  const userPrompt = `Generate a complete, runnable Google Colab notebook implementing this paper. Keep it concise but complete — aim for 15-25 cells total.
 
 --- PAPER ANALYSIS ---
 ${JSON.stringify(analysis, null, 2)}
@@ -269,9 +323,9 @@ ${JSON.stringify(plan, null, 2)}
 ${paperText}
 --- END PAPER TEXT ---
 
-Generate the full notebook as a JSON array of cells. Make it comprehensive, well-explained, and RUNNABLE.`;
+Generate the notebook as a JSON array of cells. Return ONLY the raw JSON array — no markdown code fences. Be concise but complete.`;
 
-  const cells = await callClaudeJson<NotebookCell[]>(NOTEBOOK_SYSTEM_PROMPT, userPrompt, 16000);
+  const cells = await callClaudeJson<NotebookCell[]>(NOTEBOOK_SYSTEM_PROMPT, userPrompt, 16384);
 
   // Validate cells
   if (!Array.isArray(cells) || cells.length === 0) {
