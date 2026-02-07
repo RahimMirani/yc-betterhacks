@@ -55,6 +55,8 @@ export default function App() {
   // PDF / paper data
   const [paperText, setPaperText] = useState<string>('');
   const [paperTitle, setPaperTitle] = useState<string>('');
+  const [paperPdfUrl, setPaperPdfUrl] = useState<string>('');
+  const [paperNumPages, setPaperNumPages] = useState<number>(0);
 
   // Outline & navigation
   const [outline, setOutline] = useState<OutlineItem[]>([]);
@@ -89,9 +91,17 @@ export default function App() {
     setImplementError('');
 
     try {
+      // Create a local object URL for PDF rendering (images/formulas preserved).
+      const nextPdfUrl = URL.createObjectURL(file);
+      setPaperPdfUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return nextPdfUrl;
+      });
+
       const result = await extractPdf(file);
       setPaperText(result.text);
       setPaperTitle(result.title || file.name.replace('.pdf', ''));
+      setPaperNumPages(result.numPages || 0);
       setAppState('reading');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to process PDF';
@@ -113,6 +123,11 @@ export default function App() {
       setPaperTitle(
         result.title || new URL(url).pathname.split('/').pop() || 'Research Paper'
       );
+      setPaperNumPages(result.numPages || 0);
+      setPaperPdfUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return result.pdfBlobUrl || '';
+      });
       setAppState('reading');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load PDF from URL';
@@ -177,6 +192,11 @@ export default function App() {
   const handleReset = useCallback(() => {
     setPaperText('');
     setPaperTitle('');
+    setPaperNumPages(0);
+    setPaperPdfUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return '';
+    });
     setOutline([]);
     setActiveSectionId('');
     setScrollToSectionId(null);
@@ -226,6 +246,8 @@ export default function App() {
         <PaperViewer
           paperText={paperText}
           paperTitle={paperTitle}
+          pdfUrl={paperPdfUrl}
+          numPages={paperNumPages}
           onOutlineExtracted={handleOutlineExtracted}
           onSectionChange={handleSectionChange}
           scrollToSectionId={scrollToSectionId}
