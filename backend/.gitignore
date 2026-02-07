@@ -7,6 +7,9 @@ yarn.lock
 dist/
 build/
 
+# Uploaded PDFs (dev)
+uploads/
+
 # Environment variables
 .env
 .env.local

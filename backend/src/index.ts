@@ -1,11 +1,14 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
+import { papersRouter } from './routes/papers';
+import { explainRouter } from './routes/explain';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // CORS middleware (update with your frontend URL in production)
 app.use((req, res, next) => {
@@ -24,10 +27,12 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'Better Papers API is running' });
 });
 
-// Example API endpoint
+// API routes
 app.get('/api/test', (req: Request, res: Response) => {
   res.json({ message: 'Backend API is working!' });
 });
+app.use('/api/papers', papersRouter);
+app.use('/api/explain', explainRouter);
 
 // Start server
 app.listen(PORT, () => {
