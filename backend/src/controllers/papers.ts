@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import { ApiResponse } from '../types'
 import { AppError } from '../middleware/error-handler'
+import { withTransaction } from '../db/pool'
 import { parsePdf } from '../services/pdf-parser'
 import { extractCitations } from '../services/citation-extractor'
 import { embedAndStoreChunks } from '../services/embeddings'
@@ -35,15 +36,19 @@ export async function uploadPaper(
     const { text, pageCount } = await parsePdf(req.file.buffer)
     const { title, citations } = extractCitations(text)
 
-    const paper = await insertPaper({
-      title,
-      authors: null,
-      year: null,
-      rawText: text,
-    })
+    const paper = await withTransaction(async (client) => {
+      const p = await insertPaper({
+        title,
+        authors: null,
+        year: null,
+        rawText: text,
+      }, client)
 
-    await insertCitations(paper.id, citations)
-    await embedAndStoreChunks(paper.id, text)
+      await insertCitations(p.id, citations, client)
+      await embedAndStoreChunks(p.id, text, client)
+
+      return p
+    })
 
     res.status(201).json({
       success: true,

@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { PoolClient } from '@neondatabase/serverless'
 import { env } from '../config/env'
 import { query } from '../db/pool'
 import { chunkText } from '../utils/text'
@@ -11,6 +12,7 @@ const BATCH_SIZE = 20
 export async function embedAndStoreChunks(
   paperId: string,
   text: string,
+  client?: PoolClient,
 ): Promise<number> {
   const chunks = chunkText(text)
   let stored = 0
@@ -31,11 +33,14 @@ export async function embedAndStoreChunks(
       paramIndex += 4
     }
 
-    await query(
-      `INSERT INTO paper_chunks (paper_id, chunk_index, content, embedding)
-       VALUES ${values.join(', ')}`,
-      params,
-    )
+    const sql = `INSERT INTO paper_chunks (paper_id, chunk_index, content, embedding)
+       VALUES ${values.join(', ')}`
+
+    if (client) {
+      await client.query(sql, params)
+    } else {
+      await query(sql, params)
+    }
 
     stored += batch.length
   }

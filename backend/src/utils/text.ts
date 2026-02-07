@@ -30,14 +30,29 @@ export function extractCitationContext(
   const bodyText = refIndex !== -1 ? fullText.slice(0, refIndex) : fullText
 
   // For numbered citations like [2], also match inside compound brackets
-  // e.g. [ 35 , 2 , 5] or [2, 19] or [5,2,35]
+  // e.g. [ 35 , 2 , 5] or [2, 19] or [5,2,35] or [1-3]
   const num = citationKey.match(/\[(\d+)\]/)?.[1]
   let keyIndex = -1
 
   if (num) {
-    // Match the number inside any bracket group, with flexible spacing
-    const compoundRegex = new RegExp(`\\[\\s*(?:\\d+\\s*,\\s*)*${num}(?:\\s*,\\s*\\d+)*\\s*\\]`)
-    keyIndex = bodyText.search(compoundRegex)
+    const n = Number(num)
+    // Match comma-separated groups containing this number
+    const commaRegex = new RegExp(`\\[\\s*(?:\\d+\\s*,\\s*)*${num}(?:\\s*,\\s*\\d+)*\\s*\\]`)
+    keyIndex = bodyText.search(commaRegex)
+
+    // Match range groups like [1-3] where num falls within the range
+    if (keyIndex === -1) {
+      const rangeRegex = /\[\s*(\d+)\s*-\s*(\d+)\s*\]/g
+      let rangeMatch: RegExpExecArray | null
+      while ((rangeMatch = rangeRegex.exec(bodyText)) !== null) {
+        const start = Number(rangeMatch[1])
+        const end = Number(rangeMatch[2])
+        if (n >= start && n <= end) {
+          keyIndex = rangeMatch.index
+          break
+        }
+      }
+    }
   }
 
   // Fallback: exact match

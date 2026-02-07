@@ -1,3 +1,4 @@
+import { PoolClient } from '@neondatabase/serverless'
 import { query, queryOne } from '../pool'
 
 interface CitationRow {
@@ -23,6 +24,7 @@ interface CitationRow {
 export async function insertCitations(
   paperId: string,
   citations: readonly { citationKey: string; rawReference: string | null; contextInPaper: string | null }[],
+  client?: PoolClient,
 ): Promise<void> {
   if (citations.length === 0) return
 
@@ -36,11 +38,14 @@ export async function insertCitations(
     paramIndex += 4
   }
 
-  await query(
-    `INSERT INTO citations (paper_id, citation_key, raw_reference, context_in_paper)
-     VALUES ${values.join(', ')}`,
-    params,
-  )
+  const sql = `INSERT INTO citations (paper_id, citation_key, raw_reference, context_in_paper)
+     VALUES ${values.join(', ')}`
+
+  if (client) {
+    await client.query(sql, params)
+    return
+  }
+  await query(sql, params)
 }
 
 export async function findCitationsByPaperId(paperId: string): Promise<readonly CitationRow[]> {
