@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import PdfUpload from './components/PdfUpload';
 import PaperViewer from './components/PaperViewer';
+import OutlineSidebar, { OutlineItem } from './components/OutlineSidebar';
 import Toolbar from './components/Toolbar';
 import ImplementPanel from './components/ImplementPanel';
 import { extractPdf, extractPdfFromUrl, implementPaper, StepProgress } from './services/api';
@@ -58,6 +59,11 @@ export default function App() {
   const [paperTitle, setPaperTitle] = useState<string>('');
   const [numPages, setNumPages] = useState<number>(0);
 
+  // Outline & navigation
+  const [outline, setOutline] = useState<OutlineItem[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [scrollToPage, setScrollToPage] = useState<number | null>(null);
+
   // Loading states
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');
@@ -68,18 +74,32 @@ export default function App() {
   const [implementResult, setImplementResult] = useState<ImplementationResult | null>(null);
   const [implementError, setImplementError] = useState<string>('');
 
-  // Handle PDF file selection
+  // Panel visibility
+  const [showImplementPanel, setShowImplementPanel] = useState(false);
+
+  // Derive current section from page + outline
+  const currentSection = useMemo(() => {
+    if (!outline.length || !currentPage) return '';
+    let section = '';
+    for (const item of outline) {
+      if (item.pageNumber <= currentPage) {
+        section = item.title;
+      }
+    }
+    return section;
+  }, [currentPage, outline]);
+
+  // ── PDF Upload Handlers ──
+
   const handleFileSelected = useCallback(async (file: File) => {
     setIsUploading(true);
     setUploadMessage('Extracting text from PDF...');
     setImplementError('');
 
     try {
-      // Create a blob URL for the PDF viewer
       const url = URL.createObjectURL(file);
       setPdfUrl(url);
 
-      // Extract text from the PDF via backend
       const result = await extractPdf(file);
       setPaperText(result.text);
       setPaperTitle(result.title || file.name.replace('.pdf', ''));
@@ -94,7 +114,6 @@ export default function App() {
     }
   }, []);
 
-  // Handle URL submission
   const handleUrlSubmitted = useCallback(async (url: string) => {
     setIsUploading(true);
     setUploadMessage('Fetching PDF from URL...');
@@ -116,14 +135,22 @@ export default function App() {
     }
   }, []);
 
-  // Handle "Implement Paper" button click
+  // ── Implement Paper ──
+
   const handleImplementPaper = useCallback(async () => {
     if (!paperText) return;
+
+    // If result already exists, just toggle the panel
+    if (implementResult) {
+      setShowImplementPanel((prev) => !prev);
+      return;
+    }
 
     setIsImplementing(true);
     setImplementError('');
     setImplementResult(null);
     setCurrentStep(null);
+    setShowImplementPanel(true);
 
     try {
       const result = await implementPaper(paperText, (step) => {
@@ -136,21 +163,59 @@ export default function App() {
     } finally {
       setIsImplementing(false);
     }
-  }, [paperText]);
+  }, [paperText, implementResult]);
 
-  // Reset to upload state
+  // ── Outline & Navigation ──
+
+  const handleOutlineExtracted = useCallback(
+    (extractedOutline: OutlineItem[]) => {
+      if (extractedOutline.length > 0) {
+        setOutline(extractedOutline);
+      } else if (paperText && numPages > 0) {
+        // Fallback: extract headings from the paper text
+        const fallback = extractOutlineFromText(paperText, numPages);
+        setOutline(fallback);
+      }
+    },
+    [paperText, numPages]
+  );
+
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
+
+  const handleNavigateToPage = useCallback((page: number) => {
+    setScrollToPage(page);
+    // Reset after short delay so clicking the same item again still works
+    setTimeout(() => setScrollToPage(null), 500);
+  }, []);
+
+  const handleDocumentLoad = useCallback(
+    (np: number) => {
+      if (!numPages) setNumPages(np);
+    },
+    [numPages]
+  );
+
+  // ── Reset ──
+
   const handleReset = useCallback(() => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     setPdfUrl('');
     setPaperText('');
     setPaperTitle('');
     setNumPages(0);
+    setOutline([]);
+    setCurrentPage(1);
+    setScrollToPage(null);
     setImplementResult(null);
     setImplementError('');
+    setShowImplementPanel(false);
     setAppState('upload');
   }, [pdfUrl]);
 
-  // Upload screen
+  // ── Upload screen ──
+
   if (appState === 'upload') {
     return (
       <PdfUpload
@@ -162,25 +227,40 @@ export default function App() {
     );
   }
 
-  // Reading screen with PDF viewer
+  // ── Reading screen ──
+
+  const showPanel = showImplementPanel && (implementResult || isImplementing || implementError);
+
   return (
     <div className="h-screen flex flex-col bg-white">
       <Toolbar
         paperTitle={paperTitle}
-        numPages={numPages}
+        currentSection={currentSection}
         isImplementing={isImplementing}
+        hasResult={!!implementResult}
         onImplementPaper={handleImplementPaper}
         onReset={handleReset}
       />
 
       <div className="flex-1 flex min-h-0">
-        {/* PDF Viewer */}
-        <div className={`flex-1 flex flex-col min-w-0 ${implementResult ? 'w-1/2' : 'w-full'}`}>
-          <PaperViewer pdfUrl={pdfUrl} />
-        </div>
+        {/* Left Sidebar */}
+        <OutlineSidebar
+          outline={outline}
+          currentPage={currentPage}
+          onNavigateToPage={handleNavigateToPage}
+        />
 
-        {/* Implementation Panel */}
-        {(implementResult || isImplementing || implementError) && (
+        {/* PDF Viewer */}
+        <PaperViewer
+          pdfUrl={pdfUrl}
+          onDocumentLoad={handleDocumentLoad}
+          onOutlineExtracted={handleOutlineExtracted}
+          onPageChange={handlePageChange}
+          scrollToPage={scrollToPage}
+        />
+
+        {/* Implementation Panel (right side) */}
+        {showPanel && (
           <div className="w-[480px] border-l border-border flex flex-col bg-white flex-shrink-0">
             {isImplementing && (
               <div className="flex-1 flex items-center justify-center px-8">
@@ -196,17 +276,28 @@ export default function App() {
                       { step: 4, label: 'Uploading to Colab' },
                     ].map(({ step, label }) => {
                       const isActive = currentStep?.step === step && !currentStep?.done;
-                      const isDone = currentStep ? (
-                        currentStep.step > step || (currentStep.step === step && currentStep.done)
-                      ) : false;
+                      const isDone = currentStep
+                        ? currentStep.step > step ||
+                          (currentStep.step === step && currentStep.done)
+                        : false;
                       const isPending = !currentStep || currentStep.step < step;
 
                       return (
                         <div key={step} className="flex items-center gap-3">
                           <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                             {isDone && (
-                              <svg className="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <svg
+                                className="w-4 h-4 text-success"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
                               </svg>
                             )}
                             {isActive && (
@@ -216,11 +307,15 @@ export default function App() {
                               <div className="w-2 h-2 rounded-full bg-gray-200" />
                             )}
                           </div>
-                          <span className={`text-sm ${
-                            isActive ? 'text-primary font-medium' :
-                            isDone ? 'text-secondary' :
-                            'text-gray-300'
-                          }`}>
+                          <span
+                            className={`text-sm ${
+                              isActive
+                                ? 'text-primary font-medium'
+                                : isDone
+                                ? 'text-secondary'
+                                : 'text-gray-300'
+                            }`}
+                          >
                             {label}
                           </span>
                         </div>
@@ -236,7 +331,10 @@ export default function App() {
                 <div className="text-center">
                   <p className="text-sm text-red-600 mb-3">{implementError}</p>
                   <button
-                    onClick={handleImplementPaper}
+                    onClick={() => {
+                      setImplementResult(null);
+                      handleImplementPaper();
+                    }}
                     className="text-sm text-primary underline hover:no-underline"
                   >
                     Try again
@@ -248,7 +346,7 @@ export default function App() {
             {implementResult && !isImplementing && (
               <ImplementPanel
                 result={implementResult}
-                onClose={() => setImplementResult(null)}
+                onClose={() => setShowImplementPanel(false)}
               />
             )}
           </div>
@@ -256,4 +354,54 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+/**
+ * Fallback: extract section headings from paper text when PDF has no embedded outline.
+ * Estimates page numbers based on character position in the text.
+ */
+function extractOutlineFromText(text: string, totalPages: number): OutlineItem[] {
+  const items: OutlineItem[] = [];
+  const lines = text.split('\n');
+  const totalLength = text.length;
+  let charPos = 0;
+  const seen = new Set<string>();
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    let matched = false;
+    let level = 0;
+
+    // Abstract
+    if (/^Abstract$/i.test(trimmed)) {
+      matched = true;
+      level = 0;
+    }
+    // Numbered sections: "1 Introduction", "1. Introduction"
+    else if (/^\d+\.?\s+[A-Z]/.test(trimmed) && trimmed.length > 4 && trimmed.length < 80) {
+      matched = true;
+      level = 0;
+    }
+    // Sub-sections: "3.1 Architecture", "3.1. Architecture"
+    else if (/^\d+\.\d+\.?\s+[A-Z]/.test(trimmed) && trimmed.length > 4 && trimmed.length < 80) {
+      matched = true;
+      level = 1;
+    }
+    // Common end sections
+    else if (/^(References|Acknowledgments?|Appendix.*)$/i.test(trimmed)) {
+      matched = true;
+      level = 0;
+    }
+
+    if (matched && !seen.has(trimmed)) {
+      seen.add(trimmed);
+      const estimatedPage = Math.max(1, Math.ceil((charPos / totalLength) * totalPages));
+      items.push({ title: trimmed, pageNumber: estimatedPage, level });
+    }
+
+    charPos += line.length + 1;
+  }
+
+  return items;
 }

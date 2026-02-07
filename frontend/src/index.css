@@ -48,3 +48,29 @@ button:focus-visible {
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* ── react-pdf overrides ── */
+
+/* Ensure pages render as block (no extra bottom space) */
+.react-pdf__Page canvas {
+  display: block !important;
+}
+
+/* Text layer: selectable text overlay on top of canvas */
+.react-pdf__Page__textContent {
+  user-select: text;
+}
+
+/* Annotation layer: links clickable */
+.react-pdf__Page__annotations {
+  pointer-events: auto;
+}
+
+.react-pdf__Page__annotations a {
+  color: inherit;
+}
+
+/* Smooth page load transition */
+.react-pdf__Page {
+  position: relative;
+}
