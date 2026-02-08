@@ -1,6 +1,12 @@
 # Better Papers
 
+Reimagining the interface for reading research papers
+
 A browser-based interface for reading research papers that adapts to your knowledge level. Upload a PDF and get a personalized reading experience with adaptive explanations, interactive citations, AI-assisted comprehension, and executable code implementations.
+
+## Demo
+
+[![Demo Video](https://img.youtube.com/vi/d1YbuB0d1KE/0.jpg)](https://www.youtube.com/watch?v=d1YbuB0d1KE)
 
 ## Features
 
