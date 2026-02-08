@@ -1,7 +1,7 @@
-import { lookupCitedPaper } from './semantic-scholar';
-import { explainCitationRelevance } from './claude';
-import { findSimilarChunks } from './embeddings';
-import { updateCitationEnrichment } from '../db/queries/citations';
+import { lookupCitedPaper } from "./semantic-scholar";
+import { explainCitationRelevance } from "./claude";
+import { findSimilarChunks } from "./embeddings";
+import { updateCitationEnrichment } from "../db/queries/citations";
 
 interface CitationRow {
   readonly id: string;
@@ -25,26 +25,33 @@ interface CitationRow {
 
 export async function enrichCitation(
   paperId: string,
-  citation: CitationRow
+  citation: CitationRow,
 ): Promise<CitationRow> {
+  // Step 1: Look up on Semantic Scholar
   const s2Paper = citation.raw_reference
     ? await lookupCitedPaper(citation.raw_reference)
     : null;
 
-  let context = citation.context_in_paper ?? '';
+  // Step 2: Build context for Claude explanation
+  let context = citation.context_in_paper ?? "";
 
+  // Use pgvector to find additional relevant context if available
   if (context && context.length > 0) {
     try {
       const similarChunks = await findSimilarChunks(paperId, context, 2);
-      const additionalContext = similarChunks.map((chunk) => chunk.content).join(' ');
+      const additionalContext = similarChunks
+        .map((chunk) => chunk.content)
+        .join(" ");
+
       if (additionalContext.length > 0) {
         context = `${context}\n\nAdditional context from the paper: ${additionalContext}`;
       }
     } catch {
-      // pgvector lookup failure is non-critical
+      // pgvector lookup failure is non-critical, continue with original context
     }
   }
 
+  // Step 3: Generate relevance explanation via Claude
   let relevanceExplanation: string | null = null;
   try {
     relevanceExplanation = await explainCitationRelevance({
@@ -71,7 +78,9 @@ export async function enrichCitation(
     relevanceExplanation,
     enriched: !enrichmentFailed,
     enrichmentFailed,
-    failureReason: enrichmentFailed ? 'Paper not found on Semantic Scholar' : null,
+    failureReason: enrichmentFailed
+      ? "Paper not found on Semantic Scholar"
+      : null,
   });
 
   return updated ?? citation;

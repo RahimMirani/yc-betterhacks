@@ -62,6 +62,78 @@ export async function extractPdfFromUrl(url: string): Promise<{
   return { text, numPages, title, characterCount, pdfBlobUrl };
 }
 
+// ── Citation Types ──
+
+export interface CitationSummary {
+  citationKey: string;
+  rawReference: string | null;
+}
+
+export interface StorePaperResult {
+  id: string;
+  title: string;
+  citationCount: number;
+  citations: CitationSummary[];
+}
+
+export interface CitationDetail {
+  id: string;
+  citationKey: string;
+  rawReference: string | null;
+  contextInPaper: string | null;
+  citedTitle: string | null;
+  citedAbstract: string | null;
+  citedAuthors: string[] | null;
+  citedYear: number | null;
+  citedDoi: string | null;
+  relevanceExplanation: string | null;
+  enriched: boolean;
+  enrichmentFailed: boolean;
+  failureReason: string | null;
+}
+
+/**
+ * Stores paper text in the backend and triggers citation extraction.
+ * This is a non-blocking call — if it fails, the paper still renders normally.
+ */
+export async function storePaper(text: string, title: string): Promise<StorePaperResult> {
+  const response = await fetch(`${API_BASE}/api/papers/store`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, title }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Failed to store paper' }));
+    throw new Error(error.error || `Store failed with status ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Fetches enriched citation details. Triggers lazy enrichment on the backend
+ * (Semantic Scholar lookup + Claude relevance explanation) if not yet enriched.
+ */
+export async function fetchCitationDetail(
+  paperId: string,
+  citationKey: string,
+): Promise<CitationDetail> {
+  const encodedKey = encodeURIComponent(citationKey);
+  const response = await fetch(
+    `${API_BASE}/api/papers/${paperId}/citations/${encodedKey}`,
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Failed to fetch citation' }));
+    throw new Error(error.error || `Fetch citation failed with status ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
 /**
  * Step progress update from the backend.
  */

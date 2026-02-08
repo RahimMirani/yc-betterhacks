@@ -1,17 +1,27 @@
-import path from 'path';
-import fs from 'fs';
-import { Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
-import { extractTextFromPdf } from '../services/pdfExtractor';
-import { embedAndStoreChunks } from '../services/embeddings';
-import { insertPaper, findPaperById } from '../db/queries/papers';
-import { insertCitations, findCitationsByPaperId, findCitation } from '../db/queries/citations';
-import { enrichCitation } from '../services/citation-enrichment';
+import path from "path";
+import fs from "fs";
+import { Request, Response, NextFunction } from "express";
+import { z } from "zod";
+import { extractTextFromPdf } from "../services/pdfExtractor";
+import { extractCitations } from "../services/citation-extractor";
+import { embedAndStoreChunks } from "../services/embeddings";
+import { insertPaper, findPaperById } from "../db/queries/papers";
+import {
+  insertCitations,
+  findCitationsByPaperId,
+  findCitation,
+} from "../db/queries/citations";
+import { enrichCitation } from "../services/citation-enrichment";
 
-const uploadDir = path.join(process.cwd(), 'uploads');
+const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
+
+const storePaperSchema = z.object({
+  text: z.string().min(1),
+  title: z.string().min(1),
+});
 
 const paperIdSchema = z.object({ paperId: z.string().uuid() });
 const citationParamsSchema = z.object({
@@ -20,24 +30,36 @@ const citationParamsSchema = z.object({
 });
 
 function extractTitleFromText(text: string): string {
-  const firstLine = text.split('\n').map((l) => l.trim()).find((l) => l.length > 0);
-  return firstLine && firstLine.length < 500 ? firstLine : 'Untitled Paper';
+  const firstLine = text
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
+  return firstLine && firstLine.length < 500 ? firstLine : "Untitled Paper";
 }
 
 export async function uploadPaper(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     if (!req.file || !req.file.buffer) {
-      res.status(400).json({ error: 'No PDF file provided' });
+      res.status(400).json({ error: "No PDF file provided" });
       return;
     }
 
-    const { text, numPages, title: metaTitle } = await extractTextFromPdf(req.file.buffer);
-    const title = metaTitle?.trim() || extractTitleFromText(text) || 'Untitled Paper';
-    const citations: Array<{ citationKey: string; rawReference: string | null; contextInPaper: string | null }> = [];
+    const {
+      text,
+      numPages,
+      title: metaTitle,
+    } = await extractTextFromPdf(req.file.buffer);
+    const title =
+      metaTitle?.trim() || extractTitleFromText(text) || "Untitled Paper";
+    const citations: Array<{
+      citationKey: string;
+      rawReference: string | null;
+      contextInPaper: string | null;
+    }> = [];
 
     const paper = await insertPaper({
       title,
@@ -52,7 +74,9 @@ export async function uploadPaper(
     await insertCitations(paper.id, citations);
     await embedAndStoreChunks(paper.id, text);
 
-    const filename = (req.file.originalname || title || 'paper').replace(/\.pdf$/i, '') + '.pdf';
+    const filename =
+      (req.file.originalname || title || "paper").replace(/\.pdf$/i, "") +
+      ".pdf";
     res.status(201).json({
       success: true,
       paperId: paper.id,
@@ -70,16 +94,60 @@ export async function uploadPaper(
   }
 }
 
+export async function storePaper(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { text, title } = storePaperSchema.parse(req.body);
+    const { citations } = extractCitations(text);
+
+    const paper = await insertPaper({
+      title,
+      authors: null,
+      year: null,
+      rawText: text,
+    });
+
+    await insertCitations(paper.id, citations);
+
+    // Embeddings are best-effort — don't fail the request
+    try {
+      await embedAndStoreChunks(paper.id, text);
+    } catch {
+      // Silently skip embedding failures
+    }
+
+    const storedCitations = await findCitationsByPaperId(paper.id);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: paper.id,
+        title: paper.title,
+        citationCount: citations.length,
+        citations: storedCitations.map((c) => ({
+          citationKey: c.citation_key,
+          rawReference: c.raw_reference,
+        })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getPaper(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const { paperId } = paperIdSchema.parse(req.params);
     const paper = await findPaperById(paperId);
     if (!paper) {
-      res.status(404).json({ error: 'Paper not found' });
+      res.status(404).json({ error: "Paper not found" });
       return;
     }
     const citations = await findCitationsByPaperId(paperId);
@@ -108,21 +176,21 @@ export async function getPaper(
 export async function getPaperFile(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const { paperId } = paperIdSchema.parse(req.params);
     const paper = await findPaperById(paperId);
     if (!paper) {
-      res.status(404).json({ error: 'Paper not found' });
+      res.status(404).json({ error: "Paper not found" });
       return;
     }
     const filePath = path.join(uploadDir, `${paperId}.pdf`);
     if (!fs.existsSync(filePath)) {
-      res.status(404).json({ error: 'PDF file not found' });
+      res.status(404).json({ error: "PDF file not found" });
       return;
     }
-    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader("Content-Type", "application/pdf");
     res.sendFile(filePath);
   } catch (error) {
     next(error);
@@ -132,14 +200,14 @@ export async function getPaperFile(
 export async function getCitationContext(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const { paperId, citationKey } = citationParamsSchema.parse(req.params);
     const decodedKey = decodeURIComponent(citationKey);
     let citation = await findCitation(paperId, decodedKey);
     if (!citation) {
-      res.status(404).json({ error: 'Citation not found' });
+      res.status(404).json({ error: "Citation not found" });
       return;
     }
     if (!citation.enriched && !citation.enrichment_failed) {
@@ -171,17 +239,20 @@ export async function getCitationContext(
 export async function getPaperText(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const { paperId } = paperIdSchema.parse(req.params);
     const paper = await findPaperById(paperId);
     if (!paper) {
-      res.status(404).json({ error: 'Paper not found' });
+      res.status(404).json({ error: "Paper not found" });
       return;
     }
     const citations = await findCitationsByPaperId(paperId);
-    const citationMarkers = buildCitationMarkerPositions(paper.raw_text, citations);
+    const citationMarkers = buildCitationMarkerPositions(
+      paper.raw_text,
+      citations,
+    );
     res.json({
       success: true,
       data: {
@@ -196,16 +267,22 @@ export async function getPaperText(
 
 function buildCitationMarkerPositions(
   text: string,
-  citations: readonly { citation_key: string }[]
-): readonly { key: string; positions: readonly { start: number; end: number }[] }[] {
+  citations: readonly { citation_key: string }[],
+): readonly {
+  key: string;
+  positions: readonly { start: number; end: number }[];
+}[] {
   const uniqueKeys = [...new Set(citations.map((c) => c.citation_key))];
   return uniqueKeys.map((key) => {
-    const escapedKey = key.replace(/[[\]().,]/g, '\\$&');
-    const regex = new RegExp(escapedKey, 'g');
+    const escapedKey = key.replace(/[[\]().,]/g, "\\$&");
+    const regex = new RegExp(escapedKey, "g");
     const positions: { start: number; end: number }[] = [];
     let match: RegExpExecArray | null;
     while ((match = regex.exec(text)) !== null) {
-      positions.push({ start: match.index, end: match.index + match[0].length });
+      positions.push({
+        start: match.index,
+        end: match.index + match[0].length,
+      });
     }
     return { key, positions };
   });

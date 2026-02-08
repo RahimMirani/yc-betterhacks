@@ -1,4 +1,5 @@
-import { query, queryOne } from '../pool';
+import { PoolClient } from "@neondatabase/serverless";
+import { query, queryOne } from "../pool";
 
 export interface CitationRow {
   readonly id: string;
@@ -22,7 +23,12 @@ export interface CitationRow {
 
 export async function insertCitations(
   paperId: string,
-  citations: readonly { citationKey: string; rawReference: string | null; contextInPaper: string | null }[]
+  citations: readonly {
+    citationKey: string;
+    rawReference: string | null;
+    contextInPaper: string | null;
+  }[],
+  client?: PoolClient,
 ): Promise<void> {
   if (citations.length === 0) return;
 
@@ -31,29 +37,46 @@ export async function insertCitations(
   let paramIndex = 1;
 
   for (const c of citations) {
-    values.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3})`);
+    values.push(
+      `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3})`,
+    );
     params.push(paperId, c.citationKey, c.rawReference, c.contextInPaper);
     paramIndex += 4;
   }
 
-  await query(
-    `INSERT INTO citations (paper_id, citation_key, raw_reference, context_in_paper)
-     VALUES ${values.join(', ')}`,
-    params
-  );
+  const sql = `INSERT INTO citations (paper_id, citation_key, raw_reference, context_in_paper)
+     VALUES ${values.join(", ")}`;
+
+  if (client) {
+    await client.query(sql, params);
+    return;
+  }
+  await query(sql, params);
 }
 
-export async function findCitationsByPaperId(paperId: string): Promise<readonly CitationRow[]> {
-  return query<CitationRow>(`SELECT * FROM citations WHERE paper_id = $1 ORDER BY citation_key`, [paperId]);
+export async function findCitationsByPaperId(
+  paperId: string,
+): Promise<readonly CitationRow[]> {
+  return query<CitationRow>(
+    `SELECT * FROM citations
+      WHERE paper_id = $1
+      ORDER BY
+        CASE
+          WHEN citation_key ~ '^[0-9]+$' THEN citation_key::integer
+          ELSE NULL
+        END,
+        citation_key`,
+    [paperId],
+  );
 }
 
 export async function findCitation(
   paperId: string,
-  citationKey: string
+  citationKey: string,
 ): Promise<CitationRow | null> {
   return queryOne<CitationRow>(
     `SELECT * FROM citations WHERE paper_id = $1 AND citation_key = $2`,
-    [paperId, citationKey]
+    [paperId, citationKey],
   );
 }
 
@@ -70,7 +93,7 @@ export async function updateCitationEnrichment(
     enriched: boolean;
     enrichmentFailed: boolean;
     failureReason: string | null;
-  }
+  },
 ): Promise<CitationRow | null> {
   return queryOne<CitationRow>(
     `UPDATE citations SET
@@ -99,6 +122,6 @@ export async function updateCitationEnrichment(
       data.enriched,
       data.enrichmentFailed,
       data.failureReason,
-    ]
+    ],
   );
 }

@@ -1,14 +1,18 @@
-import multer from 'multer';
-import { config } from '../config';
+import multer from "multer";
+import { AppError } from "./error-handler";
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
+const storage = multer.memoryStorage();
 
 export const uploadPdf = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: config.maxPdfSizeMB * 1024 * 1024 },
+  storage,
+  limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only PDF files are allowed'));
+    if (file.mimetype !== "application/pdf") {
+      cb(new AppError("Only PDF files are allowed", 400));
+      return;
     }
+    cb(null, true);
   },
-}).single('file');
+}).single("file");

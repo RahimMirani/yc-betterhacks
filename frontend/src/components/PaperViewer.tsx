@@ -4,6 +4,9 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import { parsePaperContent, ContentBlock } from '../utils/parsePaper';
 import type { OutlineItem } from './OutlineSidebar';
 import { explain } from '../api';
+import type { CitationSummary, CitationDetail } from '../services/api';
+import CitationText from './CitationText';
+import CitationPopover from './CitationPopover';
 
 interface PaperViewerProps {
   paperText: string;
@@ -11,9 +14,15 @@ interface PaperViewerProps {
   pdfUrl?: string;
   numPages?: number;
   paperId?: string | null;
+  citations?: CitationSummary[];
   onOutlineExtracted?: (outline: OutlineItem[]) => void;
   onSectionChange?: (sectionId: string) => void;
   scrollToSectionId?: string | null;
+}
+
+interface PopoverTarget {
+  citationKey: string;
+  anchorEl: HTMLElement;
 }
 
 export default function PaperViewer({
@@ -22,6 +31,7 @@ export default function PaperViewer({
   pdfUrl,
   numPages,
   paperId,
+  citations = [],
   onOutlineExtracted,
   onSectionChange,
   scrollToSectionId,
@@ -30,6 +40,27 @@ export default function PaperViewer({
   const hasReportedOutline = useRef(false);
   const [viewMode, setViewMode] = useState<'clean' | 'pdf'>('clean');
   const [pdfNumPages, setPdfNumPages] = useState<number | null>(numPages ?? null);
+  const [popover, setPopover] = useState<PopoverTarget | null>(null);
+  const citationCacheRef = useRef<Map<string, CitationDetail>>(new Map());
+
+  // Derive citation keys set from citations prop
+  const citationKeys = useMemo(
+    () => new Set(citations.map((c) => c.citationKey)),
+    [citations],
+  );
+
+  const handleCitationClick = useCallback(
+    (citationKey: string, anchorEl: HTMLElement) => {
+      setPopover((prev) =>
+        prev?.citationKey === citationKey ? null : { citationKey, anchorEl },
+      );
+    },
+    [],
+  );
+
+  const handlePopoverClose = useCallback(() => {
+    setPopover(null);
+  }, []);
 
   // Explain: selection + panel (only when paperId is set)
   const [selection, setSelection] = useState<{ text: string; rect: DOMRect } | null>(null);
@@ -208,7 +239,12 @@ export default function PaperViewer({
         ) : (
           <article className="max-w-[720px] mx-auto py-4">
             {blocks.map((block) => (
-              <BlockRenderer key={block.id} block={block} />
+              <BlockRenderer
+                key={block.id}
+                block={block}
+                citationKeys={citationKeys}
+                onCitationClick={handleCitationClick}
+              />
             ))}
 
             {/* Bottom spacer */}
@@ -276,12 +312,33 @@ export default function PaperViewer({
         </div>
       )}
     </div>
+
+    {popover && paperId && (
+      <CitationPopover
+        paperId={paperId}
+        citationKey={popover.citationKey}
+        anchorEl={popover.anchorEl}
+        onClose={handlePopoverClose}
+        cache={citationCacheRef}
+      />
+    )}
+    </>
   );
 }
 
 // ── Block Renderer ──
 
-function BlockRenderer({ block }: { block: ContentBlock }) {
+function BlockRenderer({
+  block,
+  citationKeys,
+  onCitationClick,
+}: {
+  block: ContentBlock;
+  citationKeys: ReadonlySet<string>;
+  onCitationClick: (key: string, anchorEl: HTMLElement) => void;
+}) {
+  const hasCitations = citationKeys.size > 0;
+
   switch (block.type) {
     case 'title':
       return (
@@ -314,7 +371,15 @@ function BlockRenderer({ block }: { block: ContentBlock }) {
     case 'abstract-paragraph':
       return (
         <p className="text-[15px] text-primary leading-[1.85] mb-4 pl-4 border-l-2 border-gray-200">
-          {block.content}
+          {hasCitations ? (
+            <CitationText
+              text={block.content}
+              citationKeys={citationKeys}
+              onCitationClick={onCitationClick}
+            />
+          ) : (
+            block.content
+          )}
         </p>
       );
 
@@ -341,7 +406,15 @@ function BlockRenderer({ block }: { block: ContentBlock }) {
     case 'paragraph':
       return (
         <p className="text-[15px] text-primary leading-[1.85] mb-4">
-          {block.content}
+          {hasCitations ? (
+            <CitationText
+              text={block.content}
+              citationKeys={citationKeys}
+              onCitationClick={onCitationClick}
+            />
+          ) : (
+            block.content
+          )}
         </p>
       );
 

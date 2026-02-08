@@ -1,14 +1,19 @@
-import OpenAI from 'openai';
-import { config } from '../config';
-import { query } from '../db/pool';
-import { chunkText } from '../utils/text';
+import OpenAI from "openai";
+import { PoolClient } from "@neondatabase/serverless";
+import { env } from "../config/env";
+import { query } from "../db/pool";
+import { chunkText } from "../utils/text";
 
-const openai = new OpenAI({ apiKey: config.openaiApiKey });
+const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
-const EMBEDDING_MODEL = 'text-embedding-3-small';
+const EMBEDDING_MODEL = "text-embedding-3-small";
 const BATCH_SIZE = 20;
 
-export async function embedAndStoreChunks(paperId: string, text: string): Promise<number> {
+export async function embedAndStoreChunks(
+  paperId: string,
+  text: string,
+  client?: PoolClient,
+): Promise<number> {
   const chunks = chunkText(text);
   let stored = 0;
 
@@ -22,17 +27,20 @@ export async function embedAndStoreChunks(paperId: string, text: string): Promis
 
     for (let j = 0; j < batch.length; j++) {
       values.push(
-        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3})`
+        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3})`,
       );
       params.push(paperId, i + j, batch[j], JSON.stringify(embeddings[j]));
       paramIndex += 4;
     }
 
-    await query(
-      `INSERT INTO paper_chunks (paper_id, chunk_index, content, embedding)
-       VALUES ${values.join(', ')}`,
-      params
-    );
+    const sql = `INSERT INTO paper_chunks (paper_id, chunk_index, content, embedding)
+       VALUES ${values.join(", ")}`;
+
+    if (client) {
+      await client.query(sql, params);
+    } else {
+      await query(sql, params);
+    }
 
     stored += batch.length;
   }
@@ -41,7 +49,7 @@ export async function embedAndStoreChunks(paperId: string, text: string): Promis
 }
 
 export async function generateEmbeddings(
-  texts: readonly string[]
+  texts: readonly string[],
 ): Promise<readonly number[][]> {
   const response = await openai.embeddings.create({
     model: EMBEDDING_MODEL,
@@ -55,7 +63,7 @@ export async function generateEmbeddings(
 export async function findSimilarChunks(
   paperId: string,
   queryText: string,
-  limit: number = 3
+  limit: number = 3,
 ): Promise<readonly { content: string; similarity: number }[]> {
   const [embedding] = await generateEmbeddings([queryText]);
 
@@ -65,7 +73,7 @@ export async function findSimilarChunks(
      WHERE paper_id = $2
      ORDER BY embedding <=> $1::vector
      LIMIT $3`,
-    [JSON.stringify(embedding), paperId, limit]
+    [JSON.stringify(embedding), paperId, limit],
   );
 
   return rows;

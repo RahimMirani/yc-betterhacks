@@ -4,8 +4,16 @@ import PaperViewer from './components/PaperViewer';
 import OutlineSidebar, { OutlineItem } from './components/OutlineSidebar';
 import Toolbar from './components/Toolbar';
 import ImplementPanel from './components/ImplementPanel';
-import { extractPdf, extractPdfFromUrl, implementPaper, StepProgress } from './services/api';
 import { uploadPdf } from './api';
+import {
+  extractPdf,
+  extractPdfFromUrl,
+  implementPaper,
+  storePaper,
+  StepProgress,
+  CitationSummary,
+} from './services/api';
+
 
 // Types for the implementation result
 interface ImplementationResult {
@@ -75,6 +83,10 @@ export default function App() {
   const [implementResult, setImplementResult] = useState<ImplementationResult | null>(null);
   const [implementError, setImplementError] = useState<string>('');
 
+  // Citation state
+  const [paperId, setPaperId] = useState<string | null>(null);
+  const [citations, setCitations] = useState<CitationSummary[]>([]);
+
   // Panel visibility
   const [showImplementPanel, setShowImplementPanel] = useState(false);
 
@@ -99,16 +111,24 @@ export default function App() {
         return nextPdfUrl;
       });
 
-      // Extract text for reading + upload to papers API so Explain works (paperId)
-      const [result, uploadResult] = await Promise.all([
-        extractPdf(file),
-        uploadPdf(file).catch(() => null),
-      ]);
-      setPaperText(result.text);
-      setPaperTitle(result.title || file.name.replace('.pdf', ''));
+      const result = await extractPdf(file);
+      const extractedText = result.text;
+      const extractedTitle = result.title || file.name.replace('.pdf', '');
+      setPaperText(extractedText);
+      setPaperTitle(extractedTitle);
       setPaperNumPages(result.numPages || 0);
       setPaperId(uploadResult?.paperId ?? null);
       setAppState('reading');
+
+      // Fire-and-forget: store paper for citation extraction
+      storePaper(extractedText, extractedTitle)
+        .then((stored) => {
+          setPaperId(stored.id);
+          setCitations(stored.citations);
+        })
+        .catch(() => {
+          // Graceful degradation — paper still renders normally
+        });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to process PDF';
       alert(message);
@@ -125,16 +145,27 @@ export default function App() {
 
     try {
       const result = await extractPdfFromUrl(url);
-      setPaperText(result.text);
-      setPaperTitle(
-        result.title || new URL(url).pathname.split('/').pop() || 'Research Paper'
-      );
+      const extractedText = result.text;
+      const extractedTitle =
+        result.title || new URL(url).pathname.split('/').pop() || 'Research Paper';
+      setPaperText(extractedText);
+      setPaperTitle(extractedTitle);
       setPaperNumPages(result.numPages || 0);
       setPaperPdfUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return result.pdfBlobUrl || '';
       });
       setAppState('reading');
+
+      // Fire-and-forget: store paper for citation extraction
+      storePaper(extractedText, extractedTitle)
+        .then((stored) => {
+          setPaperId(stored.id);
+          setCitations(stored.citations);
+        })
+        .catch(() => {
+          // Graceful degradation — paper still renders normally
+        });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load PDF from URL';
       alert(message);
@@ -210,6 +241,8 @@ export default function App() {
     setImplementResult(null);
     setImplementError('');
     setShowImplementPanel(false);
+    setPaperId(null);
+    setCitations([]);
     setAppState('upload');
   }, []);
 
@@ -256,6 +289,7 @@ export default function App() {
           pdfUrl={paperPdfUrl}
           numPages={paperNumPages}
           paperId={paperId}
+          citations={citations}
           onOutlineExtracted={handleOutlineExtracted}
           onSectionChange={handleSectionChange}
           scrollToSectionId={scrollToSectionId}

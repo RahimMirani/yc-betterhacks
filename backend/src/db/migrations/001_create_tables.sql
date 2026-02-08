@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
-CREATE TABLE IF NOT EXISTS papers (
+CREATE TABLE papers (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title           TEXT NOT NULL,
   authors         JSONB,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS papers (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS paper_chunks (
+CREATE TABLE paper_chunks (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   paper_id        UUID NOT NULL REFERENCES papers(id) ON DELETE CASCADE,
   chunk_index     INT NOT NULL,
@@ -18,10 +18,10 @@ CREATE TABLE IF NOT EXISTS paper_chunks (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_paper_chunks_paper_id ON paper_chunks(paper_id);
-CREATE INDEX IF NOT EXISTS idx_paper_chunks_embedding ON paper_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX idx_paper_chunks_paper_id ON paper_chunks(paper_id);
+CREATE INDEX idx_paper_chunks_embedding ON paper_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
-CREATE TABLE IF NOT EXISTS citations (
+CREATE TABLE citations (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   paper_id              UUID NOT NULL REFERENCES papers(id) ON DELETE CASCADE,
   citation_key          TEXT NOT NULL,
@@ -41,5 +41,5 @@ CREATE TABLE IF NOT EXISTS citations (
   enriched_at           TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_citations_paper_id ON citations(paper_id);
-CREATE INDEX IF NOT EXISTS idx_citations_lookup ON citations(paper_id, citation_key);
+CREATE INDEX idx_citations_paper_id ON citations(paper_id);
+CREATE INDEX idx_citations_lookup ON citations(paper_id, citation_key);

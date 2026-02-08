@@ -38,14 +38,6 @@ function isSubsectionHeading(line: string): boolean {
   return /^\d+\.\d+\.?\s+[A-Z]/.test(line) && line.length > 4 && line.length < 100;
 }
 
-function isKnownHeading(line: string): boolean {
-  return /^(Abstract|References|Acknowledgments?|Appendix\b)/i.test(line);
-}
-
-function isAnyHeading(line: string): boolean {
-  return isKnownHeading(line) || isSectionHeading(line) || isSubsectionHeading(line);
-}
-
 // ── Text preprocessing ──
 
 function preprocess(text: string): string {
