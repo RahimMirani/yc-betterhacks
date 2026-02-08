@@ -1,8 +1,12 @@
 import { z } from 'zod'
 import dotenv from 'dotenv'
 
+<<<<<<< Updated upstream
 dotenv.config({ path: '.env.local' })
 dotenv.config()
+=======
+dotenv.config();
+>>>>>>> Stashed changes
 
 const envSchema = z.object({
   PORT: z.string().default('3001').transform(Number),

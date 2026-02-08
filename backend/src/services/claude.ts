@@ -94,6 +94,30 @@ export async function askClaudeWithConversation(
   return textBlock && "text" in textBlock ? textBlock.text : "";
 }
 
+export async function askClaude(prompt: string): Promise<string> {
+  const message = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    messages: [{ role: 'user', content: prompt }],
+  });
+  const textBlock = message.content.find((block) => block.type === 'text');
+  return textBlock && 'text' in textBlock ? textBlock.text : '';
+}
+
+export async function askClaudeWithConversation(
+  system: string,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<string> {
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system,
+    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+  });
+  const textBlock = response.content.find((block) => block.type === 'text');
+  return textBlock && 'text' in textBlock ? textBlock.text : '';
+}
+
 export async function explainCitationRelevance(params: {
   contextInPaper: string;
   citedTitle: string | null;

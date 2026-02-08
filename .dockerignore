@@ -1,0 +1,11 @@
+# Used when building from repo root (e.g. Dockerfile.backend)
+frontend
+.git
+.env
+.env.*
+*.md
+node_modules
+**/node_modules
+**/dist
+**/.cache
+**/uploads
