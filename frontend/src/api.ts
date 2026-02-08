@@ -11,6 +11,7 @@ export async function uploadPdf(file: File): Promise<UploadResponse> {
   const res = await fetch(`${API_BASE}/api/papers/upload`, {
     method: 'POST',
     body: formData,
+    credentials: 'include',
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -37,6 +38,7 @@ export async function explain(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ paperId, selectedText, messages }),
+    credentials: 'include',
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));

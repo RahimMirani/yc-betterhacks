@@ -3,8 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import App from './App';
+import LoginPage from './pages/LoginPage';
 import ReaderUploadPage from './pages/ReaderUploadPage';
 import ReaderPage from './pages/ReaderPage';
+import AuthGuard from './components/AuthGuard';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(
@@ -14,15 +16,13 @@ root.render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/reader" element={<ReaderUploadPage />} />
-        <Route path="/reader/:paperId" element={<ReaderPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<AuthGuard><App /></AuthGuard>} />
+        <Route path="/reader" element={<AuthGuard><ReaderUploadPage /></AuthGuard>} />
+        <Route path="/reader/:paperId" element={<AuthGuard><ReaderPage /></AuthGuard>} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
