@@ -26,21 +26,32 @@ export default function ReaderPage() {
   }, []);
 
   const handleMouseUp = useCallback(() => {
-    const sel = document.getSelection();
-    if (!sel) return;
-    const text = sel.toString().trim();
-    if (!text) {
-      setSelection(null);
-      return;
-    }
-    try {
-      const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      setSelection({ text, rect });
-    } catch {
-      setSelection(null);
-    }
+    // Defer so browser has updated the selection after mouseup
+    setTimeout(() => {
+      const sel = document.getSelection();
+      if (!sel) return;
+      const text = sel.toString().trim();
+      if (!text) {
+        setSelection(null);
+        return;
+      }
+      try {
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        // Ignore collapsed or zero-size selections
+        if (rect.width === 0 && rect.height === 0) return;
+        setSelection({ text, rect });
+      } catch {
+        setSelection(null);
+      }
+    }, 0);
   }, []);
+
+  // Listen on document so we catch selection regardless of where mouseup fires (e.g. inside PDF text layer)
+  React.useEffect(() => {
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => document.removeEventListener('mouseup', handleMouseUp);
+  }, [handleMouseUp]);
 
   const handleExplain = useCallback(() => {
     if (!selection?.text || !paperId) return;
@@ -116,10 +127,7 @@ export default function ReaderPage() {
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
-        <div
-          className="flex-1 overflow-auto p-6 flex flex-col items-center"
-          onMouseUp={handleMouseUp}
-        >
+        <div className="flex-1 overflow-auto p-6 flex flex-col items-center">
           <Document
             file={pdfUrl}
             onLoadSuccess={onDocumentLoadSuccess}
@@ -146,10 +154,10 @@ export default function ReaderPage() {
 
         {selection && !showChat && (
           <div
-            className="fixed z-10 flex items-center gap-2 px-3 py-2 bg-gray-900 text-white rounded shadow-lg"
+            className="fixed z-[100] flex items-center gap-2 px-3 py-2 bg-gray-900 text-white rounded-lg shadow-xl select-none"
             style={{
-              left: selection.rect.left + selection.rect.width / 2 - 60,
-              top: selection.rect.top - 44,
+              left: Math.max(8, Math.min(window.innerWidth - 120, selection.rect.left + selection.rect.width / 2 - 60)),
+              top: Math.max(8, selection.rect.top - 44),
             }}
           >
             <button

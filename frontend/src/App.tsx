@@ -5,6 +5,7 @@ import OutlineSidebar, { OutlineItem } from './components/OutlineSidebar';
 import Toolbar from './components/Toolbar';
 import ImplementPanel from './components/ImplementPanel';
 import { extractPdf, extractPdfFromUrl, implementPaper, StepProgress } from './services/api';
+import { uploadPdf } from './api';
 
 // Types for the implementation result
 interface ImplementationResult {
@@ -57,6 +58,7 @@ export default function App() {
   const [paperTitle, setPaperTitle] = useState<string>('');
   const [paperPdfUrl, setPaperPdfUrl] = useState<string>('');
   const [paperNumPages, setPaperNumPages] = useState<number>(0);
+  const [paperId, setPaperId] = useState<string | null>(null);
 
   // Outline & navigation
   const [outline, setOutline] = useState<OutlineItem[]>([]);
@@ -91,17 +93,21 @@ export default function App() {
     setImplementError('');
 
     try {
-      // Create a local object URL for PDF rendering (images/formulas preserved).
       const nextPdfUrl = URL.createObjectURL(file);
       setPaperPdfUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return nextPdfUrl;
       });
 
-      const result = await extractPdf(file);
+      // Extract text for reading + upload to papers API so Explain works (paperId)
+      const [result, uploadResult] = await Promise.all([
+        extractPdf(file),
+        uploadPdf(file).catch(() => null),
+      ]);
       setPaperText(result.text);
       setPaperTitle(result.title || file.name.replace('.pdf', ''));
       setPaperNumPages(result.numPages || 0);
+      setPaperId(uploadResult?.paperId ?? null);
       setAppState('reading');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to process PDF';
@@ -193,6 +199,7 @@ export default function App() {
     setPaperText('');
     setPaperTitle('');
     setPaperNumPages(0);
+    setPaperId(null);
     setPaperPdfUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return '';
@@ -248,6 +255,7 @@ export default function App() {
           paperTitle={paperTitle}
           pdfUrl={paperPdfUrl}
           numPages={paperNumPages}
+          paperId={paperId}
           onOutlineExtracted={handleOutlineExtracted}
           onSectionChange={handleSectionChange}
           scrollToSectionId={scrollToSectionId}
