@@ -1,135 +1,107 @@
 # Better Papers
 
-A browser-based interface for reading research papers that adapts to your knowledge level. Better Papers transforms static PDFs into an interactive, personalized reading experience with adaptive explanations, smart citations, and AI-assisted comprehension.
+A browser-based interface for reading research papers that adapts to your knowledge level. Upload a PDF and get a personalized reading experience with adaptive explanations, interactive citations, AI-assisted comprehension, and executable code implementations.
 
-## 🚀 Overview
+## Features
 
-Reading research papers is often a linear and defying process. Better Papers solves this by:
+- **Knowledge Assessment**: The system gauges your understanding before reading and provides necessary background.
+- **Progressive Depth**: Explanations start simple and reveal technical depth as you proceed.
+- **Smart Citations**: Inline fetching and contextualization of cited works.
+- **Highlight-to-Explain**: Select text for instant AI explanations, diagrams, or examples.
+- **Code Implementation**: 
+  - **Full Paper**: Generates a complete Google Colab notebook implementing the paper's methodology.
+  - **Partial**: Implement specific algorithms or equations with a click.
+- **Progress Tracking**: Visual progress bars and comprehension checkpoints.
 
-- **Assessing your background** to tailor explanations to your level.
-- **Contextualizing citations** inline, so you never lose your place.
-- **Generating executable code** from theoretical concepts using AI.
-- **Providing instant clarification** for complex terms and math.
+## Tech Stack
 
-## ✨ Key Features
+- **Frontend**: React (TypeScript), Tailwind CSS, PDF.js (`react-pdf`)
+- **Backend**: Node.js (TypeScript), Express
+- **AI**: Anthropic Claude (Analysis & Code Gen), OpenAI (Embeddings/Completions)
+- **Database**: Neon (Serverless PostgreSQL)
+- **Infrastructure**: GitHub Gists (for storing generated notebooks)
 
-- **Knowledge Assessment**: Adapts the reading experience based on your understanding of core concepts.
-- **Progressive Depth**: Start with high-level summaries and drill down into technical details at your own pace.
-- **Smart Citations**: Instantly view cited papers and their context without leaving the current page.
-- **Highlight-to-Explain**: Select text to get AI-powered explanations, visualizations, or simplifications.
-- **Code Implementation**:
-  - **Full Paper**: Generate a complete Google Colab notebook for the entire paper.
-  - **Partial**: Implement specific algorithms or equations with a single click.
-- **📊 Progress Tracking**: Gamified reading experience with progress bars and comprehension checkpoints.
+## Prerequisites
 
-## 🛠️ Tech Stack
-
-### Frontend
-
-- **Framework**: React (TypeScript)
-- **PDF Rendering**: React-PDF / PDF.js
-- **Styling**: Tailwind CSS
-- **Routing**: React Router
-
-### Backend
-
-- **Runtime**: Node.js
-- **Framework**: Express (TypeScript)
-- **AI Models**: OpenAI & Anthropic (Claude)
-- **Database**: Neon (PostgreSQL pgVector)
-- **PDF Processing**: PDF Parse
-
-## 🏁 Getting Started
-
-### Prerequisites
-
-- Node.js (v16 or higher)
+- Node.js (v18 or higher)
 - npm or yarn
-- API Keys for OpenAI and Anthropic
-- Neon Database Connection String
+- Accounts/API Keys for:
+  - Anthropic (Claude)
+  - OpenAI
+  - Neon Database (PostgreSQL string)
+  - GitHub (Personal Access Token with `gist` scope)
 
-### Installation
+## Getting Started
 
-1. **Clone the repository**
+### 1. Clone the Repository
 
-   ```bash
-   git clone https://github.com/RahimMirani/yc-betterhacks.git
-   cd yc-betterhacks
-   ```
-
-2. **Setup Backend**
-
-   ```bash
-   cd backend
-   npm install
-   ```
-
-   Create a `.env` file in the `backend` directory based on `.env.example`:
-
-   ```bash
-   PORT=3001
-   DATABASE_URL=postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
-   ANTHROPIC_API_KEY=your_anthropic_key
-   OPENAI_API_KEY=your_openai_key
-   GITHUB_TOKEN=your_github_token
-   GITHUB_USERNAME=your_github_username
-   ```
-
-   Start the backend server:
-
-   ```bash
-   npm run dev
-   ```
-
-3. **Setup Frontend**
-   Open a new terminal and navigate to the frontend directory:
-
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-   Start the React application:
-
-   ```bash
-   npm start
-   ```
-
-   The app should now be running at `http://localhost:3000`.
-
-## 📂 Project Structure
-
-```
-yc-betterhacks/
-├── backend/                # Node.js/Express API
-│   ├── src/
-│   │   ├── db/             # Database migrations and queries
-│   │   ├── routes/         # API routes
-│   │   ├── services/       # Business logic & AI integration
-│   │   └── index.ts        # Entry point
-│   ├── .env.example
-│   └── package.json
-├── frontend/               # React Client
-│   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── pages/          # Application pages
-│   │   └── App.tsx         # Main component
-│   ├── public/
-│   └── package.json
-├── project-overview.md     # Detailed project documentation
-└── README.md
+```bash
+git clone <repository_url>
+cd yc-betterhacks
 ```
 
-## 🤝 Contributing
+### 2. Backend Setup
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Navigate to the backend directory and install dependencies:
 
-1. Fork the project
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+```bash
+cd backend
+npm install
+```
 
-## 📄 License
+Create a `.env` file based on the example:
 
-This project is licensed under the ISC License.
+```bash
+cp .env.example .env
+```
+
+Open `.env` and fill in your credentials:
+
+```env
+PORT=3001
+DATABASE_URL=postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+ANTHROPIC_API_KEY=sk-ant-api03-xxx
+OPENAI_API_KEY=sk-xxx
+GITHUB_TOKEN=ghp_xxx  # Needs 'gist' scope
+GITHUB_USERNAME=your_username
+```
+
+Start the backend server:
+
+```bash
+npm run dev
+```
+
+The backend API will be available at `http://localhost:3001`.
+
+### 3. Frontend Setup
+
+Open a new terminal, navigate to the frontend directory, and install dependencies:
+
+```bash
+cd frontend
+npm install
+```
+
+Start the React development server:
+
+```bash
+npm start
+```
+
+The application will open in your browser at `http://localhost:3000`.
+
+## Usage
+
+1. **Upload a Paper**: Drag and drop a research paper (PDF) onto the upload area.
+2. **Read & Interact**: 
+   - Highlight text to get explanations.
+   - Click citations to see context.
+3. **Implement**: 
+   - Click the "Implement Paper" button to generate a full code implementation.
+   - The system will analyze the paper, create a plan, generate a Jupyter notebook, and upload it as a GitHub Gist.
+   - You can then open the notebook directly in Google Colab.
+
+## License
+
+[ISC](LICENSE)
