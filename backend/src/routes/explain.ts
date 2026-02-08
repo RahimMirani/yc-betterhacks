@@ -143,7 +143,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const systemPrompt = `You are a helpful assistant that explains research papers. The user has selected a passage and may ask follow-ups. Use only the context below. Be concise and complete.
+    const systemPrompt = `You explain research papers in short, crisp answers. The user has selected a passage and may ask follow-ups. Use only the context below. Keep each reply to 2–5 sentences; no long paragraphs or lists unless the question explicitly asks for detail.
 
 Relevant paper sections:
 ${paperContext}

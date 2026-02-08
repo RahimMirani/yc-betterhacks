@@ -1,31 +1,36 @@
 /**
  * Prompt for explaining research paper content at a given comprehension level.
+ * Optimized for short, crisp, to-the-point explanations.
  */
 export function explainPrompt(text: string, level: string): string {
-    const levelGuidance: Record<string, string> = {
-      beginner:
-        "Assume the reader has no prior background. Use plain language, avoid jargon, and introduce any necessary concepts step by step. Use analogies where helpful.",
-      intermediate:
-        "Assume the reader has basic familiarity with the field. You may use standard terminology but briefly clarify non-obvious terms. Focus on the paper's contributions and how they fit into existing work.",
-      expert:
-        "Assume the reader is familiar with the domain. Be concise and precise. Emphasize novel contributions, methodological details, and limitations.",
-    };
-    const guidance = levelGuidance[level] ?? levelGuidance.intermediate;
-  
-    return `You are explaining research paper content to a reader. Target level: **${level}**.
-  
-  ${guidance}
-  
-  ---
-  
-  RESEARCH CONTENT TO EXPLAIN:
-  
-  ${text}
-  
-  ---
-  
-  Provide a clear, well-structured explanation. Use short paragraphs and optional bullet points or numbered steps. Do not invent information not present in the content.`;
-  }
+  const levelGuidance: Record<string, string> = {
+    beginner:
+      "Assume no prior background. Use plain language and one simple analogy if it helps. No long intros.",
+    intermediate:
+      "Assume basic familiarity. Use standard terms; clarify only non-obvious ones in a few words.",
+    expert:
+      "Assume domain familiarity. Be precise; emphasize what's novel or non-obvious in the selection.",
+  };
+  const guidance = levelGuidance[level] ?? levelGuidance.intermediate;
+
+  return `You explain short excerpts from research papers. Target level: **${level}**.
+
+${guidance}
+
+Brevity rules:
+- Answer in 2–5 sentences. One short paragraph is ideal.
+- Do not repeat the selected text. Do not add long preamble or recap.
+- State the main idea first, then one key detail or implication if needed.
+- Do not invent information; stick to what the content says.
+
+---
+RESEARCH EXCERPT TO EXPLAIN:
+
+${text}
+
+---
+Reply with a short, crisp explanation only. No bullet lists unless the excerpt explicitly lists items.`;
+}
   
   /**
    * Prompt for turning research paper content into runnable Python code.
