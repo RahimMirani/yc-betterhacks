@@ -2,7 +2,10 @@ import { betterAuth } from "better-auth";
 import { Pool } from "@neondatabase/serverless";
 import { env } from "../config/env";
 
-const socialProviders: Record<string, { clientId: string; clientSecret: string }> = {};
+const socialProviders: Record<
+  string,
+  { clientId: string; clientSecret: string }
+> = {};
 
 if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
   socialProviders.google = {
@@ -27,6 +30,9 @@ export const auth = betterAuth({
   },
   socialProviders,
   trustedOrigins: ["http://localhost:3000"],
+  advanced: {
+    useSecureCookies: false, // Set to true in production with HTTPS
+  },
 });
 
 export type Session = typeof auth.$Infer.Session;

@@ -53,7 +53,7 @@ export default function LoginPage() {
     try {
       await signIn.social({
         provider,
-        callbackURL: "/",
+        callbackURL: "http://localhost:3000/",
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : `${provider} sign in failed`);

@@ -1,8 +1,12 @@
-import * as crypto from 'crypto';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as crypto from "crypto";
+import * as fs from "fs";
+import * as path from "path";
+import { fileURLToPath } from "url";
 
-const CACHE_DIR = path.resolve(__dirname, '../../.cache');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const CACHE_DIR = path.resolve(__dirname, "../../.cache");
 
 // In-memory cache (fast lookup)
 const memoryCache = new Map<string, unknown>();
@@ -13,7 +17,7 @@ const memoryCache = new Map<string, unknown>();
  */
 function getCacheKey(paperText: string): string {
   const sample = paperText.substring(0, 10000);
-  return crypto.createHash('md5').update(sample).digest('hex');
+  return crypto.createHash("md5").update(sample).digest("hex");
 }
 
 /**
@@ -43,7 +47,7 @@ export function getCache<T>(paperText: string): T | null {
   const filePath = path.join(CACHE_DIR, `${key}.json`);
   if (fs.existsSync(filePath)) {
     try {
-      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
       // Load into memory for next time
       memoryCache.set(key, data);
       console.log(`[Cache] HIT (disk) — key: ${key.substring(0, 8)}...`);
@@ -69,7 +73,7 @@ export function setCache<T>(paperText: string, data: T): void {
   // Save to disk (so it survives server restarts)
   ensureCacheDir();
   const filePath = path.join(CACHE_DIR, `${key}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(data), 'utf-8');
+  fs.writeFileSync(filePath, JSON.stringify(data), "utf-8");
 
   console.log(`[Cache] SAVED — key: ${key.substring(0, 8)}...`);
 }
