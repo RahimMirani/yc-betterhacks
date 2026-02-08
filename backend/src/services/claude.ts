@@ -133,27 +133,73 @@ export interface GeneratedNotebook {
   colabTitle: string;
 }
 
+// Rate limiting configuration
+const RATE_LIMIT_DELAY = 6000; // 6 seconds between requests
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 10000; // 10 seconds initial retry delay
+
+/**
+ * Sleep utility for rate limiting
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * Helper: sends a prompt to Claude and returns the text response.
+ * Includes rate limiting and retry logic.
  */
-async function callClaude(
-  systemPrompt: string,
-  userPrompt: string,
-  maxTokens: number = 4096,
-): Promise<string> {
-  const message = await client.messages.create({
-    model: MODEL,
-    max_tokens: maxTokens,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  });
 
-  const textBlock = message.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("Claude returned no text response");
+async function callClaude(systemPrompt: string, userPrompt: string, maxTokens: number = 4096): Promise<string> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      // Add delay between requests to respect rate limits
+      if (attempt > 0) {
+        const backoffDelay = RETRY_DELAY * Math.pow(2, attempt - 1);
+        console.log(`[Rate Limit] Retry attempt ${attempt + 1}/${MAX_RETRIES}. Waiting ${backoffDelay}ms...`);
+        await sleep(backoffDelay);
+      }
+
+      const message = await client.messages.create({
+        model: MODEL,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: userPrompt },
+        ],
+      });
+
+      const textBlock = message.content.find((block) => block.type === 'text');
+      if (!textBlock || textBlock.type !== 'text') {
+        throw new Error('Claude returned no text response');
+      }
+
+      // Add delay after successful request to prevent hitting rate limits on next call
+      await sleep(RATE_LIMIT_DELAY);
+
+      return textBlock.text;
+    } catch (error: any) {
+      lastError = error;
+      
+      // Check if it's a rate limit error
+      if (error?.status === 429 || error?.error?.type === 'rate_limit_error') {
+        console.log(`[Rate Limit] Hit rate limit on attempt ${attempt + 1}/${MAX_RETRIES}`);
+        
+        // If this is not the last attempt, continue to retry
+        if (attempt < MAX_RETRIES - 1) {
+          continue;
+        }
+      } else {
+        // For non-rate-limit errors, throw immediately
+        throw error;
+      }
+    }
   }
 
-  return textBlock.text;
+  // If we exhausted all retries, throw the last error
+  throw new Error(`Failed after ${MAX_RETRIES} attempts. Last error: ${lastError?.message || 'Unknown error'}`);
 }
 
 /**
