@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
+import { config } from "../config";
 import { extractTextFromPdf } from "../services/pdfExtractor";
 import { extractCitations } from "../services/citation-extractor";
 import { embedAndStoreChunks } from "../services/embeddings";
@@ -13,10 +14,8 @@ import {
 } from "../db/queries/citations";
 import { enrichCitation } from "../services/citation-enrichment";
 
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+/** Upload directory from config (env UPLOAD_DIR or default cwd/uploads). */
+const uploadDir = config.uploadDir;
 
 const storePaperSchema = z.object({
   text: z.string().min(1),
@@ -134,6 +133,8 @@ export async function storePaper(
       },
     });
   } catch (error) {
+    // Log DB/validation errors so Railway logs show the real cause
+    console.error("[storePaper] error:", error);
     next(error);
   }
 }

@@ -1,4 +1,6 @@
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+import { API_BASE, parseJsonResponse } from './apiClient';
+
+export { getApiBase } from './apiClient';
 
 export interface UploadResponse {
   paperId: string;
@@ -6,17 +8,15 @@ export interface UploadResponse {
 }
 
 export async function uploadPdf(file: File): Promise<UploadResponse> {
+  const url = `${API_BASE}/api/papers/upload`;
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch(`${API_BASE}/api/papers/upload`, {
-    method: 'POST',
-    body: formData,
-  });
+  const res = await fetch(url, { method: 'POST', body: formData });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
+    const err = await parseJsonResponse<{ error?: string }>(res, url).catch(() => ({ error: res.statusText }));
     throw new Error(err.error || 'Upload failed');
   }
-  return res.json();
+  return parseJsonResponse<UploadResponse>(res, url);
 }
 
 export function fetchPdfUrl(paperId: string): string {
@@ -30,17 +30,18 @@ export interface ExplainResponse {
 export async function explain(
   paperId: string,
   selectedText: string,
-  messages?: Array<{ role: 'user' | 'assistant'; content: string }>, 
+  messages?: Array<{ role: 'user' | 'assistant'; content: string }>,
   level?: string,
 ): Promise<ExplainResponse> {
-  const res = await fetch(`${API_BASE}/api/explain`, {
+  const url = `${API_BASE}/api/explain`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ paperId, selectedText, messages }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
+    const err = await parseJsonResponse<{ error?: string }>(res, url).catch(() => ({ error: res.statusText }));
     throw new Error(err.error || 'Explain failed');
   }
-  return res.json();
+  return parseJsonResponse<ExplainResponse>(res, url);
 }

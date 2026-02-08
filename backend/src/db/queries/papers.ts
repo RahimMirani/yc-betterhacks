@@ -1,4 +1,4 @@
-import { PoolClient } from "@neondatabase/serverless";
+import { PoolClient } from "pg";
 import { query, queryOne } from "../pool";
 
 interface PaperRow {

@@ -2,6 +2,9 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -19,12 +22,14 @@
     "react-scripts": "5.0.1",
     "react-syntax-highlighter": "^16.1.0",
     "typescript": "^4.9.5",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "serve": "^14.2.4"
   },
   "scripts": {
     "start": "react-app-rewired start",
     "dev": "react-app-rewired start",
     "build": "react-app-rewired build",
+    "serve": "serve -s build",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject"
   },

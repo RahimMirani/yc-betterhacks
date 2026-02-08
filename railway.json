@@ -1,0 +1,16 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "description": "Monorepo: create two Railway services. Set Root Directory to 'backend' for API and 'frontend' for web app. Each service has its own railway.json in that folder.",
+  "services": [
+    {
+      "name": "backend",
+      "rootDirectory": "backend",
+      "note": "Use backend/railway.json; build: npm run build, start: npm run start"
+    },
+    {
+      "name": "frontend",
+      "rootDirectory": "frontend",
+      "note": "Use frontend/railway.json; set REACT_APP_API_URL to backend URL; build: npm run build, start: npm run serve"
+    }
+  ]
+}

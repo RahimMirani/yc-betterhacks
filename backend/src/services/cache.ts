@@ -2,7 +2,8 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const CACHE_DIR = path.resolve(__dirname, '../../.cache');
+/** Cache directory: use CACHE_DIR env (e.g. /tmp/cache on Railway) or .cache in cwd. */
+const CACHE_DIR = process.env.CACHE_DIR || path.resolve(process.cwd(), '.cache');
 
 // In-memory cache (fast lookup)
 const memoryCache = new Map<string, unknown>();

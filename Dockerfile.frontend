@@ -1,0 +1,31 @@
+# Frontend build from repo root (same repo as backend)
+# Set REACT_APP_API_URL in Railway Variables to your backend URL (build-time).
+# In Railway: Builder = Dockerfile, Dockerfile Path = Dockerfile.frontend, Start = (default below)
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Build-time: Railway injects REACT_APP_API_URL; pass as ARG so it's available during npm run build
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
+COPY frontend/package*.json ./
+RUN npm install
+
+COPY frontend/ ./
+RUN npm run build
+
+# Serve the built app (serve reads PORT from env; Railway sets PORT)
+FROM node:20-alpine
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN npm install -g serve@14
+
+COPY --from=builder /app/build ./build
+
+EXPOSE 3000
+
+CMD ["serve", "-s", "build"]

@@ -1,4 +1,4 @@
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+import { API_BASE, parseJsonResponse } from '../apiClient';
 
 /**
  * Uploads a PDF file to the backend and returns extracted text.
@@ -9,20 +9,18 @@ export async function extractPdf(file: File): Promise<{
   title: string;
   characterCount: number;
 }> {
+  const url = `${API_BASE}/api/extract-pdf`;
   const formData = new FormData();
   formData.append('pdf', file);
 
-  const response = await fetch(`${API_BASE}/api/extract-pdf`, {
-    method: 'POST',
-    body: formData,
-  });
+  const response = await fetch(url, { method: 'POST', body: formData });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+    const error = await parseJsonResponse<{ error?: string }>(response, url).catch(() => ({ error: 'Upload failed' }));
     throw new Error(error.error || `Upload failed with status ${response.status}`);
   }
 
-  const result = await response.json();
+  const result = await parseJsonResponse<{ data: { text: string; numPages: number; title: string; characterCount: number } }>(response, url);
   return result.data;
 }
 
@@ -36,18 +34,19 @@ export async function extractPdfFromUrl(url: string): Promise<{
   characterCount: number;
   pdfBlobUrl: string;
 }> {
-  const response = await fetch(`${API_BASE}/api/extract-pdf-url`, {
+  const reqUrl = `${API_BASE}/api/extract-pdf-url`;
+  const response = await fetch(reqUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url }),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Failed to load PDF from URL' }));
+    const error = await parseJsonResponse<{ error?: string }>(response, reqUrl).catch(() => ({ error: 'Failed to load PDF from URL' }));
     throw new Error(error.error || `Failed to load PDF from URL (status ${response.status})`);
   }
 
-  const result = await response.json();
+  const result = await parseJsonResponse<{ data: { text: string; numPages: number; title: string; characterCount: number; pdfBase64: string } }>(response, reqUrl);
   const { text, numPages, title, characterCount, pdfBase64 } = result.data;
 
   // Convert base64 PDF to a blob URL for the viewer
@@ -97,18 +96,19 @@ export interface CitationDetail {
  * This is a non-blocking call — if it fails, the paper still renders normally.
  */
 export async function storePaper(text: string, title: string): Promise<StorePaperResult> {
-  const response = await fetch(`${API_BASE}/api/papers/store`, {
+  const reqUrl = `${API_BASE}/api/papers/store`;
+  const response = await fetch(reqUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, title }),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Failed to store paper' }));
+    const error = await parseJsonResponse<{ error?: string }>(response, reqUrl).catch(() => ({ error: 'Failed to store paper' }));
     throw new Error(error.error || `Store failed with status ${response.status}`);
   }
 
-  const result = await response.json();
+  const result = await parseJsonResponse<{ data: StorePaperResult }>(response, reqUrl);
   return result.data;
 }
 
@@ -121,16 +121,15 @@ export async function fetchCitationDetail(
   citationKey: string,
 ): Promise<CitationDetail> {
   const encodedKey = encodeURIComponent(citationKey);
-  const response = await fetch(
-    `${API_BASE}/api/papers/${paperId}/citations/${encodedKey}`,
-  );
+  const reqUrl = `${API_BASE}/api/papers/${paperId}/citations/${encodedKey}`;
+  const response = await fetch(reqUrl);
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Failed to fetch citation' }));
+    const error = await parseJsonResponse<{ error?: string }>(response, reqUrl).catch(() => ({ error: 'Failed to fetch citation' }));
     throw new Error(error.error || `Fetch citation failed with status ${response.status}`);
   }
 
-  const result = await response.json();
+  const result = await parseJsonResponse<{ data: CitationDetail }>(response, reqUrl);
   return result.data;
 }
 
@@ -196,14 +195,15 @@ export async function implementPaper(
   paperText: string,
   onStepUpdate?: (progress: StepProgress) => void
 ): Promise<ImplementResult> {
-  const response = await fetch(`${API_BASE}/api/implement-paper`, {
+  const reqUrl = `${API_BASE}/api/implement-paper`;
+  const response = await fetch(reqUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ paperText }),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Implementation failed' }));
+    const error = await parseJsonResponse<{ error?: string }>(response, reqUrl).catch(() => ({ error: 'Implementation failed' }));
     throw new Error(error.error || `Implementation failed with status ${response.status}`);
   }
 
@@ -211,7 +211,7 @@ export async function implementPaper(
 
   // Cached result — normal JSON response
   if (contentType.includes('application/json')) {
-    const result = await response.json();
+    const result = await parseJsonResponse<{ data: ImplementResult }>(response, reqUrl);
     return result.data;
   }
 

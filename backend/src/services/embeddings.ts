@@ -1,10 +1,10 @@
 import OpenAI from "openai";
-import { PoolClient } from "@neondatabase/serverless";
-import { env } from "../config/env";
+import { PoolClient } from "pg";
+import { config } from "../config";
 import { query } from "../db/pool";
 import { chunkText } from "../utils/text";
 
-const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+const openai = new OpenAI({ apiKey: config.openaiApiKey });
 
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const BATCH_SIZE = 20;
@@ -27,7 +27,7 @@ export async function embedAndStoreChunks(
 
     for (let j = 0; j < batch.length; j++) {
       values.push(
-        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3})`,
+        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}::vector)`,
       );
       params.push(paperId, i + j, batch[j], JSON.stringify(embeddings[j]));
       paramIndex += 4;

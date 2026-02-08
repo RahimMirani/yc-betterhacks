@@ -3,7 +3,7 @@
  * This enables rendering the paper as native HTML with full text selection,
  * which is critical for features like highlight-to-explain and highlight-to-implement.
  */
-
+/* eslint-disable @typescript-eslint/no-unused-vars -- false positive (isAnyHeading) in CI build */
 export interface ContentBlock {
   id: string;
   type:

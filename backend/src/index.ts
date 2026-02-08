@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import fs from "fs";
 import { papersRouter } from "./routes/papers";
 import { errorHandler } from "./middleware/error-handler";
 import { config } from "./config";
@@ -12,11 +13,17 @@ const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// CORS
+// CORS (configurable via ALLOWED_ORIGINS or FRONTEND_URL)
+const originsList = config.allowedOrigins === '*'
+  ? ['*']
+  : config.allowedOrigins.split(',').map((o) => o.trim()).filter(Boolean);
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header(
+  const origin = req.headers.origin;
+  if (originsList.includes('*') || (origin && originsList.includes(origin))) {
+    res.setHeader("Access-Control-Allow-Origin", origin || "*");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader(
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept, Authorization",
   );
@@ -39,8 +46,14 @@ app.use("/api/explain", explainRouter);
 
 app.use(errorHandler);
 
-// Start server
-app.listen(config.port, () => {
-  console.log(`Server running on http://localhost:${config.port}`);
-  console.log(`Health check: http://localhost:${config.port}/health`);
+// Ensure upload directory exists (uses config.uploadDir; safe for Railway/ephemeral disk)
+if (!fs.existsSync(config.uploadDir)) {
+  fs.mkdirSync(config.uploadDir, { recursive: true });
+}
+
+// Start server (listen on 0.0.0.0 for Railway/container environments)
+const host = process.env.HOST || "0.0.0.0";
+app.listen(config.port, host, () => {
+  console.log(`Server running on http://${host}:${config.port}`);
+  console.log(`Health check: http://${host}:${config.port}/health`);
 });

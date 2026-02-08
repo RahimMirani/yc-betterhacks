@@ -12,6 +12,7 @@ import {
   StepProgress,
   CitationSummary,
 } from './services/api';
+import { getApiBase } from './api';
 
 
 // Types for the implementation result
@@ -385,6 +386,10 @@ export default function App() {
           </div>
         )}
       </div>
+      {/* Show API base so you can confirm deployed app points at the right backend */}
+      <footer className="px-3 py-1 text-[10px] text-gray-400 border-t border-gray-100">
+        API: {getApiBase()}
+      </footer>
     </div>
   );
 }
