@@ -1,7 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import App from './App';
+import ReaderUploadPage from './pages/ReaderUploadPage';
+import ReaderPage from './pages/ReaderPage';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(
@@ -9,7 +12,13 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<App />} />
+        <Route path="/reader" element={<ReaderUploadPage />} />
+        <Route path="/reader/:paperId" element={<ReaderPage />} />
+      </Routes>
+    </BrowserRouter>
   </React.StrictMode>
 );
 

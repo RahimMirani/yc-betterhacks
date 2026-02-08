@@ -4,6 +4,12 @@ import { buildNotebook, notebookToString, NotebookCell } from './notebookBuilder
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+const MODEL = 'claude-sonnet-4-20250514';
+
+const client = new Anthropic({
+  apiKey: config.anthropicApiKey,
+});
+
 export interface PaperAnalysis {
   title: string;
   authors: string;
@@ -58,6 +64,61 @@ export interface ImplementationPlan {
   totalEstimatedLines: number;
 }
 
+export async function askClaude(prompt: string): Promise<string> {
+  const message = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    messages: [{ role: 'user', content: prompt }],
+  });
+  const textBlock = message.content.find((block) => block.type === 'text');
+  return textBlock && 'text' in textBlock ? textBlock.text : '';
+}
+
+export async function askClaudeWithConversation(
+  system: string,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<string> {
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system,
+    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+  });
+  const textBlock = response.content.find((block) => block.type === 'text');
+  return textBlock && 'text' in textBlock ? textBlock.text : '';
+}
+
+export async function explainCitationRelevance(params: {
+  contextInPaper: string;
+  citedTitle: string | null;
+  citedAbstract: string | null;
+  rawReference: string | null;
+}): Promise<string> {
+  const citedInfo = params.citedTitle
+    ? `Cited paper title: "${params.citedTitle}"\nCited paper abstract: "${params.citedAbstract ?? 'Not available'}"`
+    : `Raw reference: "${params.rawReference ?? 'Not available'}"`;
+
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 300,
+    messages: [
+      {
+        role: 'user',
+        content: `You are an academic paper reading assistant. Given the following context from a research paper where a citation appears, and information about the cited paper, explain in 2-3 sentences why this citation is relevant and what the reader should know about the cited work in this context.
+
+Source paper context: "${params.contextInPaper}"
+
+${citedInfo}
+
+Explain the relevance concisely. Do not use phrases like "This citation" or "The cited paper" — refer to the work by its subject matter directly.`,
+      },
+    ],
+  });
+
+  const textBlock = response.content.find((block) => block.type === 'text');
+  return textBlock && 'text' in textBlock ? textBlock.text : 'Unable to generate explanation.';
+}
+
 export interface GeneratedNotebook {
   notebookJson: string;
   cells: NotebookCell[];
@@ -70,7 +131,6 @@ const anthropic = new Anthropic({
   apiKey: config.anthropicApiKey,
 });
 
-const MODEL = 'claude-sonnet-4-20250514';
 
 // Rate limiting configuration
 const RATE_LIMIT_DELAY = 6000; // 6 seconds between requests
@@ -88,6 +148,7 @@ function sleep(ms: number): Promise<void> {
  * Helper: sends a prompt to Claude and returns the text response.
  * Includes rate limiting and retry logic.
  */
+
 async function callClaude(systemPrompt: string, userPrompt: string, maxTokens: number = 4096): Promise<string> {
   let lastError: Error | null = null;
   

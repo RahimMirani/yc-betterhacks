@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 interface PdfUploadProps {
   onFileSelected: (file: File) => void;
@@ -125,6 +126,13 @@ export default function PdfUpload({ onFileSelected, onUrlSubmitted, isLoading, l
             onChange={handleInputChange}
             className="hidden"
           />
+
+          <p className="mt-4 text-center text-[12px] text-gray-400">
+            <Link to="/reader" className="text-gray-500 hover:text-primary hover:underline">
+              Open in Reader
+            </Link>
+            {' — select text to get explanations'}
+          </p>
 
           {/* Divider */}
           <div className="flex items-center gap-4 my-7">
