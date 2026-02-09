@@ -15,6 +15,7 @@ export async function extractPdf(file: File): Promise<{
   const response = await fetch(`${API_BASE}/api/extract-pdf`, {
     method: 'POST',
     body: formData,
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -40,6 +41,7 @@ export async function extractPdfFromUrl(url: string): Promise<{
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url }),
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -101,6 +103,7 @@ export async function storePaper(text: string, title: string): Promise<StorePape
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, title }),
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -123,6 +126,7 @@ export async function fetchCitationDetail(
   const encodedKey = encodeURIComponent(citationKey);
   const response = await fetch(
     `${API_BASE}/api/papers/${paperId}/citations/${encodedKey}`,
+    { credentials: 'include' },
   );
 
   if (!response.ok) {
@@ -200,6 +204,7 @@ export async function implementPaper(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ paperText }),
+    credentials: 'include',
   });
 
   if (!response.ok) {

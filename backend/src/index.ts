@@ -1,4 +1,7 @@
 import express, { Request, Response } from "express";
+import { toNodeHandler } from "better-auth/node";
+import { auth } from "./lib/auth";
+import { requireAuth } from "./middleware/auth";
 import { papersRouter } from "./routes/papers";
 import { errorHandler } from "./middleware/error-handler";
 import { config } from "./config";
@@ -8,18 +11,18 @@ import { explainRouter } from "./routes/explain";
 
 const app = express();
 
-// Middleware
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-// CORS
+// CORS — must come first, with credentials support for auth cookies
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept, Authorization",
   );
+  res.header("Access-Control-Allow-Credentials", "true");
   if (req.method === "OPTIONS") {
     res.sendStatus(200);
   } else {
@@ -27,15 +30,22 @@ app.use((req, res, next) => {
   }
 });
 
+// Better Auth handler — MUST be before express.json()
+app.all("/api/auth/*", toNodeHandler(auth));
+
+// Body parsing
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", message: "Better Papers API is running" });
 });
 
-// Routes
-app.use("/api", pdfRoutes);
-app.use("/api", implementRoutes);
-app.use("/api/papers", papersRouter);
-app.use("/api/explain", explainRouter);
+// Protected routes — require authentication
+app.use("/api/papers", requireAuth, papersRouter);
+app.use("/api/explain", requireAuth, explainRouter);
+app.use("/api", requireAuth, pdfRoutes);
+app.use("/api", requireAuth, implementRoutes);
 
 app.use(errorHandler);
 
